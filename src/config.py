@@ -2,7 +2,7 @@ import torch
 
 # --- THÔNG SỐ MODEL & DATASET ---
 DATASET_ID = "TIGER-Lab/MathInstruct"
-BASE_MODEL = "meta-llama/Llama-3.2-1B-Instruct"
+BASE_MODEL = "unsloth/Llama-3.2-1B-Instruct"
 
 # --- THÔNG SỐ HUẤN LUYỆN ---
 MAX_SEQ_LENGTH = 128
