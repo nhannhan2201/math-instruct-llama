@@ -1,10 +1,18 @@
+# --- Deep Learning & Model ---
 torch
 transformers
 peft
 trl
 bitsandbytes
 datasets
-gradio
-mlflow
-dvc[gdrive]
 huggingface_hub
+
+# --- Web API & Server (Mới thêm) ---
+fastapi
+uvicorn
+pydantic
+gradio
+
+# --- Tracking & MLOps ---
+mlflow
+# dvc[gdrive]

@@ -2,19 +2,13 @@
 __pycache__/
 venv/
 *.pyc
+.env
 
-# Data & Models & Logs
-data/*
-!data/*.dvc
-
-models/*
-!models/*.dvc
-
+# Data, Models & Logs (Tránh push nhầm file nặng lên Git)
+data/
+models/
 mlruns/
 mlruns.db
 
-# DVC & OS
-/.dvc/cache
-/.dvc/tmp
+# OS
 .DS_Store
-.env

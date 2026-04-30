@@ -1,0 +1,17 @@
+# Bỏ qua môi trường ảo và cache để Docker không bị nặng
+__pycache__/
+*.pyc
+venv/
+miniconda3/
+.env
+
+# Bỏ qua lịch sử Git
+.git/
+.gitignore
+
+# Bỏ qua log và data train (vì lúc chạy API không cần thiết)
+mlruns/
+mlruns.db
+data/
+
+# CHÚ Ý: KHÔNG ignore thư mục models/ ở đây vì Docker CẦN copy model vào để chạy API!
