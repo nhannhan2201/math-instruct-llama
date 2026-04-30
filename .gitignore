@@ -4,9 +4,14 @@ venv/
 *.pyc
 
 # Data & Models & Logs
-data/
-models/
+data/*
+!data/*.dvc
+
+models/*
+!models/*.dvc
+
 mlruns/
+mlruns.db
 
 # DVC & OS
 /.dvc/cache
