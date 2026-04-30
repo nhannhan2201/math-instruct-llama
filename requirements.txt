@@ -1,0 +1,10 @@
+torch
+transformers
+peft
+trl
+bitsandbytes
+datasets
+gradio
+mlflow
+dvc[gdrive]
+huggingface_hub

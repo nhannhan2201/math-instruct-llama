@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+venv/
+*.pyc
+
+# Data & Models & Logs
+data/
+models/
+mlruns/
+
+# DVC & OS
+/.dvc/cache
+/.dvc/tmp
+.DS_Store
+.env
