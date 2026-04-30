@@ -4,7 +4,7 @@ Dự án triển khai mô hình AI chuyên giải toán học, được Fine-tun
 
 ---
 
-## 🐳 1. Hướng dẫn sử dụng bằng Docker (Nhanh nhất)
+# 🐳 1. Hướng dẫn sử dụng bằng Docker (Nhanh nhất)
 
 Nếu bạn chỉ muốn **chạy thử mô hình và gọi API** mà không cần cài đặt code, thư viện hay Python, hãy sử dụng Docker Image đã được đóng gói sẵn.
 
@@ -18,20 +18,20 @@ sudo docker run --rm \
   nhannguyen2201/math-llama-app:v1
 '''
 
-💻 2. Hướng dẫn Dành cho Developer (Cài đặt & Huấn luyện)
+# 💻 2. Hướng dẫn Dành cho Developer (Cài đặt & Huấn luyện)
 
 git clone https://github.com/nhannhan2201/math-instruct-llama.git
 
 cd math-instruct-llama
 pip install -r requirements.txt
 
-# Chạy QLoRA (Mặc định - Khuyên dùng vì tiết kiệm RAM):
+## Chạy QLoRA (Mặc định - Khuyên dùng vì tiết kiệm RAM):
 python src/train.py --method qlora
 
-# Chạy LoRA (Tiêu chuẩn):
+## Chạy LoRA (Tiêu chuẩn):
 python src/train.py --method lora
 
-# Chạy TinyLoRA (Dành cho thiết bị cực yếu):
+## Chạy TinyLoRA (Dành cho thiết bị cực yếu):
 python src/train.py --method tinylora
 
 
