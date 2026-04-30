@@ -20,5 +20,20 @@ sudo docker run --rm \
 
 💻 2. Hướng dẫn Dành cho Developer (Cài đặt & Huấn luyện)
 
-git clone 
+git clone https://github.com/nhannhan2201/math-instruct-llama.git
+
+cd math-instruct-llama
+pip install -r requirements.txt
+
+# Chạy QLoRA (Mặc định - Khuyên dùng vì tiết kiệm RAM):
+python src/train.py --method qlora
+
+# Chạy LoRA (Tiêu chuẩn):
+python src/train.py --method lora
+
+# Chạy TinyLoRA (Dành cho thiết bị cực yếu):
+python src/train.py --method tinylora
+
+
+
 
