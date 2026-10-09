@@ -44,8 +44,8 @@ TODO = chưa thực hiện; IN PROGRESS = còn acceptance chưa đạt; BLOCKED 
 | 4B — Shared inference | IN PROGRESS | Greedy/path/revision/protocol guards và random adapter round-trip; base-only/real weights chưa verified |
 | 5A — Kaggle readiness | IN PROGRESS | CPU dependency/config contracts PASS, GPU-only guards và smoke CLI; CUDA stack chưa verified |
 | 6 — Tracking/resources | IN PROGRESS | MLflow temp-store round-trip PASS; resource/timing hooks chưa actual GPU measurements |
-| 5B — LoRA smoke | TODO | Chưa optimizer steps/save-reload verified |
-| 5C — QLoRA smoke | TODO | Chưa quantized optimizer/runtime verified |
+| 5B — LoRA smoke | IN PROGRESS | User Kaggle notebook2/2 steps + validation100/100 + save PASS; reload/inference còn mở |
+| 5C — QLoRA smoke | IN PROGRESS | GPU run fail trước step1 vì TRL casts adaptersBF16/FP16 scaler; fix CPU-tested, GPU rerun còn mở |
 | 7A — Validation/protocol lock | TODO | Chưa baseline/pilot/locked config |
 | 7B — Controlled benchmark | TODO | Chưa actual benchmark results |
 | 8A — API hardening | IN PROGRESS | Lifespan/readiness/bounds/safe errors/lock implemented; GPU serving chưa verified |
@@ -353,3 +353,14 @@ Actual user smoke traceback dừng trong data preparation trước model load/op
 Fix: pin ordered-content SHA256 `6b438786f5ef69c39ac752b4d6eb7ccbfbfd69787ea61047f4a30702a475cc1a` trong config, đối chiếu existing verified manifest. `load_or_create_manifest` kiểm tra content pin ngay sau rebuild, trước create/reuse/write. Khi source checksums null/empty, dùng requested revision và bắt buộc content verification downstream; không ghi nhận đây là observed Hub revision. Khi source metadata có ghi, giữ guard unique matching pinned revision, reject wrong/ambiguous/unrecognized source. Metadata nêu verification method. Không đổi dedup/split/manifest format/order/selected/effective IDs hoặc masking; không tin cache path, không bypass guard và không tạo snapshot pin từ dataset vừa tải ở Kaggle.
 
 Regression coverage: null/empty metadata accepted only through pinned content checks; altered raw rows fail cả trước create mới và trước overwrite existing manifest, file bytes preserved; wrong source revision/unrecognized metadata fail. CPU offline unit17/17 PASS; production real-data integration7410 samples PASS, counts7359/7310/49/100 và manifest/effective-ID hashes giữ nguyên; GPU runtime vẫn chờ rerun CLI của repo trên Kaggle. Không model weights download/local GPU/full training.
+
+
+## 14. QLoRA FP16 GradScaler compatibility — 2026-10-09
+
+User APPROVE sửa train.py/tests/docs và commit/push để rerun đúng repo. User notebook `tune-peft.ipynb` ghi LoRA smoke2/2 steps, losses1.039/0.9418, train_loss0.9906, validation100/100 và saved `models/lora_smoke_dd18ef5ce227/final`; run có cell uninstall legacy torchao0.10.0, không phải clean-environment proof. Notebook là user-generated input, không stage/commit. User sau đó yêu cầu không thêm torchao/dependency changes; scope này chỉ precision fix đã approve.
+
+Actual QLoRA traceback: data7310/100, NF4 model load + selected64/validation100 tokenization đạt; fail trước optimizer step1 tại FP16 scaler `unscale_`, `_amp_foreach_non_finite_check_and_unscale_cuda` không hỗ trợ BF16. Đối chiếu installed/official TRL1.3.0 `sft_trainer.py`: constructor tự cast mọi requires_grad parameter sang BF16 cho 4/8bit models, không kiểm tra args.fp16. Model compute FP16 và native-BF16 guard không đủ ngăn cast này.
+
+Fix sau SFTTrainer construction, trước optimizer creation/train: chỉ khi method=qlora và config.fp16, cast requires_grad parameters sang FP32. Không cast frozen base/NF4 storage; quantization compute vẫn FP16, native BF16 mode/LoRA giữ nguyên. Metadata ghi actual trainable dtypes. Move smoke initial-parameter snapshot sau Trainer/correction để precision rounding không tạo false-positive adapter update. Không đổi hyperparameters, data/split/length/masking/protocol hoặc dependencies.
+
+Regression production wiring mô phỏng Trainer cast BF16: adapters trở vềFP32 trước train, frozen BF16 base giữ nguyên dtype/values; finite positive adapter update vẫn được kiểm tra. Negative case: BF16 round-trip nhưng optimizer không update phải fail. CPU offline17/17 + git diff --check là acceptance; actual QLoRA GPU rerun/save/reload chưa verified. Không pretrained weights download/local GPU/full training trong lượt fix này.

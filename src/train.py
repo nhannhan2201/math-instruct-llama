@@ -142,10 +142,19 @@ def main(argv=None):
         if not trainable or any("lora" not in n.lower() for n in trainable):
             raise ValueError("Unexpected trainable base parameters")
         mlflow.log_metric("trainable_parameters", sum(p.numel() for p in trainable.values()))
-        initial = {n: p.detach().cpu().clone() for n, p in trainable.items()} if args.smoke else None
         trainer = SFTTrainer(model=model, args=config, train_dataset=train_ds,
             eval_dataset=eval_ds, processing_class=tokenizer,
             callbacks=[RunCallback(tokenizer, metadata)])
+        if args.method == "qlora" and config.fp16:
+            # TRL 1.3.0 casts quantized-model adapters to BF16 even in FP16 mode.
+            # FP16 GradScaler needs FP32 trainable weights/gradients; leave the
+            # frozen NF4 base and quantization compute dtype untouched.
+            for parameter in trainer.model.parameters():
+                if parameter.requires_grad:
+                    parameter.data = parameter.data.to(torch.float32)
+        metadata["trainable_dtypes"] = sorted({str(p.dtype) for p in trainable.values()})
+        # Snapshot after Trainer's dtype changes so casts cannot count as updates.
+        initial = {n: p.detach().cpu().clone() for n, p in trainable.items()} if args.smoke else None
         torch.cuda.synchronize()
         torch.cuda.reset_peak_memory_stats()
         started = time.perf_counter()

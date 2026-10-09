@@ -180,13 +180,20 @@ class TrainingRuntimeContractTests(unittest.TestCase):
         from src.config import BASE_REVISION, TOKENIZER_REVISION
         events = []
         parameter = torch.nn.Parameter(torch.zeros(1))
+        frozen = torch.nn.Parameter(torch.tensor([0.5], dtype=torch.bfloat16), requires_grad=False)
+        frozen_before = frozen.detach().clone()
         model = MagicMock()
-        model.named_parameters.return_value = [("lora_A", parameter)]
+        model.named_parameters.return_value = [("lora_A", parameter), ("base.weight", frozen)]
+        model.parameters.return_value = [parameter, frozen]
         trainer = MagicMock()
+        trainer.model = model
         trainer.state.global_step = 2
         trainer.evaluate.return_value = {"eval_loss": 1.0}
         def train_two():
             events.append("train")
+            self.assertEqual(parameter.dtype, torch.float32)
+            self.assertEqual(frozen.dtype, torch.bfloat16)
+            self.assertTrue(torch.equal(frozen, frozen_before))
             with torch.no_grad():
                 parameter.add_(1)
         trainer.train.side_effect = train_two
@@ -227,6 +234,11 @@ class TrainingRuntimeContractTests(unittest.TestCase):
             self.assertEqual(protocol.call_args.args[0].name, "final")
             events.clear()
             model.is_loaded_in_4bit = True
+            def quantized_trainer(**kwargs):
+                # Reproduce TRL's unconditional BF16 adapter cast at construction.
+                parameter.data = parameter.data.to(torch.bfloat16)
+                return trainer
+            trainer_class.side_effect = quantized_trainer
             with patch.object(train, "prepare_model_for_kbit_training", side_effect=lambda m, **kw: events.append("kbit") or m) as kbit:
                 train.main(["--method", "qlora", "--smoke"])
                 self.assertEqual(events, ["seed", "tokenizer", "base", "kbit", "adapter", "train"])
@@ -236,6 +248,12 @@ class TrainingRuntimeContractTests(unittest.TestCase):
                 self.assertEqual(quantization.bnb_4bit_quant_type, "nf4")
                 self.assertTrue(quantization.bnb_4bit_use_double_quant)
                 self.assertEqual(trainer.evaluate.call_count, 2)
+                self.assertEqual(metadata["trainable_dtypes"], ["torch.float32"])
+                # A BF16 round-trip alone must not be reported as a smoke update.
+                parameter.data = torch.tensor([0.1234567], dtype=torch.float32)
+                trainer.train.side_effect = lambda: None
+                with self.assertRaisesRegex(ValueError, "did not update"):
+                    train.main(["--method", "qlora", "--smoke"])
 
 
     def test_random_adapter_and_mlflow_round_trip(self):
