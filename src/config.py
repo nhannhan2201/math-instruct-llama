@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import torch
 
 # --- THÔNG SỐ MODEL & DATASET ---
@@ -7,6 +9,8 @@ BASE_MODEL = "unsloth/Llama-3.2-1B-Instruct"
 # --- THÔNG SỐ HUẤN LUYỆN ---
 MAX_SEQ_LENGTH = 128
 MAX_EVAL_SAMPLES = 100
+MAX_TEST_SAMPLES = 500
+SPLIT_MANIFEST_PATH = Path(__file__).resolve().parents[1] / "data" / "split_manifest.json"
 TRAIN_FRACTION = 0.03
 SEED = 42
 
