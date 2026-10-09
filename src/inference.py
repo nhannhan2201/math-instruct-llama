@@ -41,10 +41,10 @@ class MathSolver:
         precision = metadata.get("precision")
         if precision not in (None, "torch.float16", "torch.bfloat16"):
             raise ValueError("Unsupported artifact precision")
-        if precision == "torch.bfloat16" and not (torch.cuda.is_available() and torch.cuda.is_bf16_supported()):
+        if precision == "torch.bfloat16" and not (torch.cuda.is_available() and torch.cuda.is_bf16_supported(including_emulation=False)):
             raise ValueError("Artifact requires a BF16-capable CUDA GPU")
         dtype = (torch.bfloat16 if precision == "torch.bfloat16" else torch.float16) if precision else (
-            torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else torch.float16)
+            torch.bfloat16 if torch.cuda.is_available() and torch.cuda.is_bf16_supported(including_emulation=False) else torch.float16)
 
         # Chỉ load 4-bit nếu phương pháp là qlora
         if method == "qlora":

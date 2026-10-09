@@ -45,7 +45,7 @@ Trong sandbox session đã dùng `/home/nhan/miniconda3/envs/math-instruct-llama
 
 Full mode giữ seed42, rank4/alpha8/dropout0.05, target q/k/v/o + gate/up/down projections, LR2e-4, epoch1, microbatch1, accumulation32, cosine/warmup5 và paged_adamw_8bit. Đây là starting config, chưa benchmark tối ưu. TinyLoRA vẫn là CLI lịch sử, ngoài comparison và chưa verified GPU.
 
-Chỉ chấp nhận **một visible CUDA GPU**. T4 dùng FP16 khi không hỗ trợ BF16; GPU hỗ trợ BF16 dùng BF16. QLoRA NF4/double quant có cùng compute dtype và phải thật sự loaded-in-4bit. `use_cache=False` khi train; gradient checkpointing explicit True, `use_reentrant=False` đồng nhất ở kbit helper và Trainer. Những settings này đã kiểm tra CPU contract, chưa bảo đảm VRAM/kernel/runtime Kaggle.
+Chỉ chấp nhận **một visible CUDA GPU**. T4 dùng FP16; chỉ chọn BF16 khi `is_bf16_supported(including_emulation=False)` xác nhận hỗ trợ native. Default True có thể tính cả emulation trên T4. QLoRA NF4/double quant có cùng compute dtype và phải thật sự loaded-in-4bit. `use_cache=False` khi train; gradient checkpointing explicit True, `use_reentrant=False` đồng nhất ở kbit helper và Trainer. Những settings này đã kiểm tra CPU contract, chưa bảo đảm VRAM/kernel/runtime Kaggle.
 
 Trước load weights, chạy inventory/imports trên Kaggle và lưu kết quả:
 
@@ -58,7 +58,7 @@ import torch, transformers, trl, peft, accelerate, datasets, bitsandbytes, mlflo
 print({p: version(p) for p in ('torch','transformers','trl','peft','accelerate','datasets','bitsandbytes','mlflow')})
 print(torch.__version__, torch.version.cuda, torch.cuda.is_available())
 if torch.cuda.is_available():
-    print(torch.cuda.get_device_name(0), torch.cuda.is_bf16_supported())
+    print(torch.cuda.get_device_name(0), torch.cuda.is_bf16_supported(including_emulation=False))
 PY
 ```
 

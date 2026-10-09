@@ -196,7 +196,7 @@ class TrainingRuntimeContractTests(unittest.TestCase):
             stack.enter_context(patch.object(train, "OUTPUT_ROOT", tmp))
             stack.enter_context(patch.object(train.torch.cuda, "is_available", return_value=True))
             stack.enter_context(patch.object(train.torch.cuda, "device_count", return_value=1))
-            stack.enter_context(patch.object(train.torch.cuda, "is_bf16_supported", return_value=False))
+            stack.enter_context(patch.object(train.torch.cuda, "is_bf16_supported", side_effect=lambda including_emulation=True: including_emulation))
             for name in ("set_device", "synchronize", "reset_peak_memory_stats", "get_device_name", "max_memory_allocated", "max_memory_reserved"):
                 stack.enter_context(patch.object(train.torch.cuda, name, return_value=0))
             for name in ("set_tracking_uri", "set_experiment", "log_params", "log_metric", "log_metrics", "log_dict", "log_artifacts"):
@@ -212,6 +212,9 @@ class TrainingRuntimeContractTests(unittest.TestCase):
             train.main(["--method", "lora", "--smoke"])
             self.assertEqual(events, ["seed", "tokenizer", "base", "adapter", "train"])
             self.assertEqual(base_loader.call_args.kwargs["revision"], BASE_REVISION)
+            self.assertEqual(base_loader.call_args.kwargs["dtype"], torch.float16)
+            self.assertTrue(trainer_class.call_args.kwargs["args"].fp16)
+            self.assertFalse(trainer_class.call_args.kwargs["args"].bf16)
             self.assertEqual(token_loader.call_args.kwargs["revision"], TOKENIZER_REVISION)
             self.assertEqual(trainer_class.call_args.kwargs["args"].max_steps, 2)
             self.assertEqual(len(trainer_class.call_args.kwargs["train_dataset"]), 64)

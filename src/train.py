@@ -87,7 +87,7 @@ def main(argv=None):
     if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
         raise RuntimeError("Training requires exactly one visible CUDA GPU; select CUDA_VISIBLE_DEVICES=0")
     set_seed(SEED)  # Before model and adapter initialization, including TinyLoRA.
-    bf16 = torch.cuda.is_bf16_supported()
+    bf16 = torch.cuda.is_bf16_supported(including_emulation=False)
     dtype = torch.bfloat16 if bf16 else torch.float16
     mode = "smoke" if args.smoke else "training"
     root = Path(OUTPUT_ROOT) / f"{args.method}_{mode}_{uuid4().hex[:12]}"

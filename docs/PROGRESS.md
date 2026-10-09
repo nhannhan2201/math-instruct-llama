@@ -329,3 +329,18 @@ data/      models/      mlruns/      mlruns.db*          # generated, ignored
 **Còn cần GPU thật:** chốt compatible torch/CUDA/driver/bitsandbytes stack + clean pip check; LoRA và QLoRA smoke riêng, mỗi2 steps; actual NF4/paged optimizer, finite real loss/gradients/update/frozen base, VRAM/time hooks; save/reload/generate và numerical tolerance trên same settings; real API serving và Docker host/image. Kaggle provisioning/copy/cache missing behavior trên fresh host vẫn cần verify. Answer evaluator/base-only benchmark/test scoring/UI nằm ngoài implementation smoke scope, không tự mở Task4/deployment.
 
 Lệnh future sau GPU/model-access approval: `CUDA_VISIBLE_DEVICES=0 python -m src.train --method lora --smoke`, rồi qlora; inference `--adapter-path <printed-final-path> --greedy`. Commands đầy đủ/cache/setup/limits ở GUIDE. Implementation CPU scope và cleanup hoàn tất; chờ user review, không tự GPU/full run.
+
+## 11. Kaggle environment preflight — native BF16 guard, 2026-10-09
+
+User-provided Kaggle inventory: Python3.13.15, torch2.11.0+cu128/CUDA build12.8, driver580.178.04, one visible TeslaT4; installed transformers5.16.1/peft0.20.0/accelerate1.14.0/datasets4.8.5/huggingface_hub1.29.0, trl/bitsandbytes/mlflow missing. Global pip check reports unrelated preinstalled bigframes/google-colab/dopamine-rl/moviepy conflicts. Inventory is user output, not an agent-executed GPU smoke; requirements baseline was verified on Python3.10, Python3.13 package resolution/imports still need Kaggle evidence. Do not replace the working torch/CUDA stack without cause.
+
+Confirmed precision bug: default `torch.cuda.is_bf16_supported()` includes emulation and reported True on T4. Changed training and inference guards to `including_emulation=False`, so native capability decides dtype/AMP; GUIDE preflight updated. Existing main-wiring regression simulates default emulationTrue/nativeFalse and asserts FP16 model/config. CPU offline16/16 tests and diff check PASS; no data/split/manifest changes, pretrained weights/GPU/full training. These follow-up changes are local, not committed/pushed in this turn. Next Kaggle step: native capability check + pinned training-stack pip dry-run constrained to existing torch build; only proceed to install/provision/smoke after resolution evidence.
+
+
+## 12. Clone-and-run handoff — 2026-10-09
+
+User yêu cầu kiểm chứng chính repo để người khác clone và chạy, không patch source trong notebook. Native BF16 fix được đưa vào handoff Git cùng regression/docs; README thêm clone/install/smoke quickstart. Không tạo notebook-specific training code hoặc đổi hyperparameters. `train` tự provision pinned tokenizer/data/model và manifest; standalone preparation chỉ cần khi kiểm tra data riêng.
+
+Kaggle output do user cung cấp xác nhận dry-run returncode0, install/imports PASS cho torch2.11.0+cu128, transformers5.7.0, trl1.3.0, peft0.19.1, accelerate1.13.0, datasets4.8.5, bitsandbytes0.49.2, huggingface_hub1.12.2, mlflow3.11.1; một T4 capability7.5/nativeBF16False. Chỉ GPU detection/imports verified; kernels/training/save-reload chưa chạy. Global pip check vẫn FAIL: preexisting packages và mới thêm conflicts Gradio/Diffusers với pinned Hub, PyOpenSSL với cryptography; không tuyên bố Kaggle environment sạch. Non-core web dependencies trong requirements chưa cài/verify trên Kaggle ở lượt này.
+
+CPU offline regression16/16 và diff check PASS cho native-BF16 delta (không thay data/manifest); actual Kaggle next command dùng repo CLI `CUDA_VISIBLE_DEVICES=0 python -m src.train --method lora --smoke`. Khi có lỗi phải sửa repo và tests rồi chuyển commit mới, không dùng hidden notebook workaround. Không chạy local GPU/full training hoặc tải pretrained weights trong lượt handoff này.
