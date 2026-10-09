@@ -92,6 +92,30 @@ class DataPreparationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'integrity/settings'):
                 load_or_create_manifest(self.raw, 'test-revision', path, **self.settings)
 
+    def test_missing_source_metadata_requires_pinned_content(self):
+        from src.config import DATASET_REVISION
+        from src.data_prep import cached_revision
+        self.raw.info.download_checksums = None
+        revision = cached_revision(self.raw)
+        self.assertEqual(revision, DATASET_REVISION)
+        expected = build_manifest(self.raw, revision, **self.settings)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "manifest.json")
+            # Fixture content identity stands in for the verified real snapshot.
+            with patch("src.data_prep.DATASET_SNAPSHOT_HASH", expected["snapshot_hash"]):
+                actual = load_or_create_manifest(self.raw, revision, path, **self.settings)
+                self.assertEqual(actual, expected)
+                original = path.read_bytes()
+                changed = copy.deepcopy(self.rows)
+                changed[0]["output"] = "tampered"
+                with self.assertRaisesRegex(ValueError, "pinned snapshot"):
+                    load_or_create_manifest(Dataset.from_list(changed), revision, path, **self.settings)
+                self.assertEqual(path.read_bytes(), original)
+                absent = Path(tmp, "wrong.json")
+                with self.assertRaisesRegex(ValueError, "pinned snapshot"):
+                    load_or_create_manifest(Dataset.from_list(changed), revision, absent, **self.settings)
+                self.assertFalse(absent.exists())
+
     def test_training_entrypoint_compatible(self):
         from transformers import AutoTokenizer
         from src.config import BASE_MODEL, TOKENIZER_REVISION

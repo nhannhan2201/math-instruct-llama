@@ -6,7 +6,7 @@ from pathlib import Path
 
 from datasets import load_dataset
 from src.config import (
-    BASE_MODEL, BASE_REVISION, TOKENIZER_REVISION, DATASET_ID, DATASET_REVISION, MAX_EVAL_SAMPLES, TRAIN_FRACTION,
+    BASE_MODEL, BASE_REVISION, TOKENIZER_REVISION, DATASET_ID, DATASET_REVISION, DATASET_SNAPSHOT_HASH, MAX_EVAL_SAMPLES, TRAIN_FRACTION,
     SEED, SYSTEM_MESSAGE, CHAT_TEMPLATE_KWARGS, MAX_SEQ_LENGTH, MAX_TEST_SAMPLES, SPLIT_MANIFEST_PATH
 )
 
@@ -137,6 +137,8 @@ def build_manifest(raw_ds, revision, seed=SEED, validation_size=MAX_EVAL_SAMPLES
 def load_or_create_manifest(raw_ds, revision, path, **settings):
     """Recompute expected structure to verify snapshot AND all manifest relations."""
     expected = build_manifest(raw_ds, revision, **settings)
+    if revision == DATASET_REVISION and expected["snapshot_hash"] != DATASET_SNAPSHOT_HASH:
+        raise ValueError("Dataset content differs from pinned snapshot; refusing manifest creation/reuse")
     path = Path(path)
     if path.exists():
         actual = json.loads(path.read_text(encoding="utf-8"))
@@ -156,6 +158,11 @@ def cached_revision(raw_ds):
     # Datasets offline fallback may ignore the requested revision. Verify the
     # source URI recorded by the builder, never infer identities from Arrow paths.
     checksums = raw_ds.info.download_checksums or {}
+    if not checksums:
+        # Online builders may not record checksums. This is the requested pin,
+        # not a claimed resolved revision: load_or_create_manifest MUST verify
+        # the independently pinned ordered-content hash before accepting rows.
+        return DATASET_REVISION
     revisions = {match.group(1) for uri in checksums
                  if (match := re.fullmatch(
                      rf"hf://datasets/{re.escape(DATASET_ID)}@([0-9a-f]{{40}})/.+", uri))}
@@ -225,6 +232,11 @@ def prepare_data(tokenizer, *, return_metadata=False):
     raw_ds = load_dataset(DATASET_ID, revision=DATASET_REVISION)["train"]
     manifest = load_or_create_manifest(raw_ds, cached_revision(raw_ds), SPLIT_MANIFEST_PATH)
     result = prepared_from_manifest(raw_ds, tokenizer, manifest, return_metadata=return_metadata)
+    if return_metadata:
+        result[2]["dataset_verification"] = {
+            "content_hash": DATASET_SNAPSHOT_HASH,
+            "source_revision_verified": bool(raw_ds.info.download_checksums),
+        }
     print(f"Đã chuẩn bị MathInstruct: train={len(result[0])}, eval={len(result[1])}")
     return result
 

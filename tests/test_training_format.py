@@ -131,7 +131,10 @@ class TrainingRuntimeContractTests(unittest.TestCase):
         raw.info.download_checksums = {f"hf://datasets/{DATASET_ID}@{'0'*40}/file": {}}
         with self.assertRaisesRegex(ValueError, "pinned revision"):
             cached_revision(raw)
-        raw.info.download_checksums = {}
+        for missing in (None, {}):
+            raw.info.download_checksums = missing
+            self.assertEqual(cached_revision(raw), DATASET_REVISION)
+        raw.info.download_checksums = {"https://example.com/unverified.json": {}}
         with self.assertRaisesRegex(ValueError, "source metadata"):
             cached_revision(raw)
         with patch("src.data_prep.load_dataset", side_effect=FileNotFoundError("offline cache missing")) as loader:
