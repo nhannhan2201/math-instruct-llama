@@ -93,28 +93,30 @@ class DataPreparationTests(unittest.TestCase):
                 load_or_create_manifest(self.raw, 'test-revision', path, **self.settings)
 
     def test_training_entrypoint_compatible(self):
-        class Tokenizer:
-            eos_token = '<EOS>'
+        from transformers import AutoTokenizer
+        from src.config import BASE_MODEL, TOKENIZER_REVISION
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=TOKENIZER_REVISION, local_files_only=True)
         m = self.build()
         with patch('src.data_prep.load_dataset', return_value={'train': self.raw}), \
              patch('src.data_prep.cached_revision', return_value='test-revision'), \
              patch('src.data_prep.load_or_create_manifest', return_value=m):
-            train, evaluation = prepare_data(Tokenizer())
-        self.assertEqual(train.column_names, ['text'])
-        self.assertEqual(evaluation.column_names, ['text'])
+            train, evaluation = prepare_data(tokenizer)
+        self.assertEqual(train.column_names, ['prompt', 'completion', 'chat_template_kwargs'])
+        self.assertEqual(evaluation.column_names, ['prompt', 'completion', 'chat_template_kwargs'])
         self.assertEqual(len(evaluation), 3)
 
     def test_schema_and_original_formatter(self):
-        class Tokenizer:
-            eos_token = '<EOS>'
+        from transformers import AutoTokenizer
+        from src.config import BASE_MODEL, TOKENIZER_REVISION
+        tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL, revision=TOKENIZER_REVISION, local_files_only=True)
         m = self.build()
-        train, validation = prepared_from_manifest(self.raw, Tokenizer(), m)
-        self.assertEqual(train.column_names, ['text'])
-        self.assertEqual(validation.column_names, ['text'])
+        train, validation = prepared_from_manifest(self.raw, tokenizer, m)
+        self.assertEqual(train.column_names, ['prompt', 'completion', 'chat_template_kwargs'])
+        self.assertEqual(validation.column_names, ['prompt', 'completion', 'chat_template_kwargs'])
         i = m['pairs'][m['training_subset'][0]]['raw_indices'][0]
         r = self.raw[i]
-        self.assertEqual(train[0]['text'], format_batch(
-            {'instruction': [r['instruction']], 'output': [r['output']]}, Tokenizer())['text'][0])
+        expected = format_batch({'instruction': [r['instruction']], 'output': [r['output']]}, tokenizer)
+        self.assertEqual(train[0], {key: values[0] for key, values in expected.items()})
 
 
 if __name__ == '__main__':

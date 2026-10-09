@@ -14,17 +14,17 @@ Mỗi task record ghi ngày, approval/scope, files/functions, commands/environme
 
 ## 2. Task hiện tại và approval gates
 
-**Task hiện tại: migration tài liệu**, chỉ GUIDE/PROGRESS/README và historical notice. Implementation và documentation checks hoàn tất theo record cuối file, đang chờ user review. Không training, cleanup scripts hoặc Task 3B.
+**Task hiện tại: Implementation đã được APPROVED — BLOCKER/REQUIRED + cleanup.** Kết quả hiện tại ở section 10; sections 4–9 là records lịch sử, gates/target tree cũ đã được approval mới thay thế. Không GPU/full training/commit/push/deployment.
 
 | Nội dung | Approval/status |
 |---|---|
 | Roadmap tổng thể Base/LoRA/QLoRA đến deployment | User APPROVED; không cấp phép tự triển khai mọi task |
 | Task 3A: offline analysis trên train/validation | User APPROVED và đã thực hiện |
 | Quy trình hai tài liệu và migration tài liệu | User APPROVED, scope bốn Markdown files |
-| Chat prompt-completion / explicit masking | Proposal sau 3A, **chờ review và approval triển khai** |
-| Max length 1024/2048 | Candidates để GPU thử, **chưa chốt**; production vẫn 128 |
-| Reject/quarantine samples quá dài | Proposal, **chưa duyệt**; manifest/effective selections chưa đổi |
-| Task 3B / scripts cleanup / GPU runs | **Chưa được phép thực hiện** |
+| Chat prompt-completion / explicit masking | User APPROVED Task 3B; implemented, CPU IDs/labels PASS |
+| Max length 1024/2048 | 1024 được APPROVED cho implementation/pilot; 2048 candidate, benchmark config chưa khóa |
+| Reject/quarantine samples quá dài | APPROVED exclude train/fail validation; effective subset riêng, manifest không đổi |
+| Implementation/cleanup | User APPROVED BLOCKER/REQUIRED và cleanup hai scripts/bốn reports sau PASS; GPU/full training chưa được duyệt |
 
 Quyết định lịch sử được ghi trong kế hoạch cũ: seed 42, dedup trước group split, validation 100/test 500 groups, 3% train records sau split; primary/all references riêng; JSON reports; dùng real cached MathInstruct; CPU local/GPU Kaggle; TinyLoRA ngoài comparison; MLflow/FastAPI/Docker local, không registry/Kubernetes/public deployment. Đây là baseline hiện có, không biến các đề xuất Task 3A thành approval.
 
@@ -37,20 +37,20 @@ TODO = chưa thực hiện; IN PROGRESS = còn acceptance chưa đạt; BLOCKED 
 | 1 — Inspection | DONE | Real-data statistics pipeline cũ + actual collator trên ba samples; không forward |
 | 2 — Dedup/group split/manifest | DONE | Bảy unit tests và hai preparations reported PASS; exact-normalized-question overlap 0 |
 | 3A — Length/truncation/masking analysis | DONE | 7.359 train/100 primary validation; 300 actual-label cases PASS; không GPU |
-| 3 — Formatting/loss tổng thể | IN PROGRESS | 3A hoàn tất; 3B chưa được phép implement; length cuối chưa chốt |
-| 3B — Production formatting/loss | TODO | Chờ review 3A và approval riêng |
-| 3C — Snapshot/provisioning | TODO | Chưa pin revisions/provisioning |
+| 3 — Formatting/loss tổng thể | IN PROGRESS | 3A/3B CPU checks PASS; cleanup/docs review và GPU pilot còn mở |
+| 3B — Production formatting/loss | DONE (CPU scope) | Current integration7410 samples PASS, invariants preserved, cleanup/docs completed; không GPU proof |
+| 3C — Snapshot/provisioning | DONE (CPU scope) | Immutable pins/source checks, production cached loader PASS; fresh Kaggle provisioning còn verification |
 | 4A — Evaluator | TODO | Chưa có answer evaluator |
-| 4B — Shared inference | TODO | Base-only/greedy/artifact tokenizer chưa có |
-| 5A — Kaggle readiness | TODO | Installed packages không chứng minh GPU compatibility |
-| 6 — Tracking/resources | TODO | Logging cơ bản có, acceptance đầy đủ chưa đạt |
+| 4B — Shared inference | IN PROGRESS | Greedy/path/revision/protocol guards và random adapter round-trip; base-only/real weights chưa verified |
+| 5A — Kaggle readiness | IN PROGRESS | CPU dependency/config contracts PASS, GPU-only guards và smoke CLI; CUDA stack chưa verified |
+| 6 — Tracking/resources | IN PROGRESS | MLflow temp-store round-trip PASS; resource/timing hooks chưa actual GPU measurements |
 | 5B — LoRA smoke | TODO | Chưa optimizer steps/save-reload verified |
 | 5C — QLoRA smoke | TODO | Chưa quantized optimizer/runtime verified |
 | 7A — Validation/protocol lock | TODO | Chưa baseline/pilot/locked config |
 | 7B — Controlled benchmark | TODO | Chưa actual benchmark results |
-| 8A — API hardening | TODO | API có code, lifecycle/readiness/tests chưa đạt |
+| 8A — API hardening | IN PROGRESS | Lifespan/readiness/bounds/safe errors/lock implemented; GPU serving chưa verified |
 | 8B — UI | TODO | Chưa có UI source |
-| 8C — Docker verification | TODO | Recipe có, build/GPU runtime chưa verified |
+| 8C — Docker verification | IN PROGRESS | Mount-based recipe, duplicate install removed; build/runtime/image selection chưa verified |
 | 8D — Documentation/end-to-end | TODO | GUIDE/PROGRESS hiện có; clean setup/runtime walkthrough chưa đạt |
 | Migration tài liệu | DONE | Bốn Markdown files; links/paths, integrity và diff checks PASS; chờ user review |
 
@@ -63,23 +63,23 @@ TODO = chưa thực hiện; IN PROGRESS = còn acceptance chưa đạt; BLOCKED 
 - **Statistics:** 7.858 train samples trước Task 2; min/median/p90/p95/p99/max 58/192/467/656,15/1.018,86/2.012. Vượt 128: 7.040 (89,59%); 256: 2.105; 512: 649. Tại 128: 7.005 answer truncated, 1.107 mất toàn answer, 7.040 mất EOS.
 - **Actual labels reported PASS:** TRL 1.3.0, Transformers 5.7.0, Torch 2.11.0, PEFT 0.19.1, Accelerate 1.13.0; ba samples CPU với tiny random model. Prompt unmasked, real labels bằng IDs, padding -100 bên phải; có sample chỉ còn prompt targets. Không numerical loss/forward/training.
 - **Acceptance/limits:** Task 1 DONE trong phạm vi inspection/preprocessing/collator; số liệu không đại diện train mới. Nhận định thiếu TRL ban đầu áp dụng Python mặc định, đã giải quyết bằng env sẵn có, không cài thêm.
-- **Evidence:** [data_inspection_report.json](data_inspection_report.json), các Task 1 records trong [lịch sử](IMPLEMENTATION_PLAN.md). Không chạy lại script để ghi đè evidence cũ.
+- **Evidence:** `data_inspection_report.json` (đã xóa; xem Git lịch sử), các Task 1 records trong [lịch sử](IMPLEMENTATION_PLAN.md). Không chạy lại script để ghi đè evidence cũ.
 
 ### Task 2 — duplicate audit rồi deterministic preparation
 
-- **Audit trước fix:** 262.039 raw, 224.460 questions, 246.002 pairs; 12.202 duplicate pair groups, 16.037 surplus records, 8.993 questions có distinct outputs. Pipeline cũ train/validation có 5 shared questions. [Audit report](data_duplicates_report.json) là bằng chứng trước group split.
+- **Audit trước fix:** 262.039 raw, 224.460 questions, 246.002 pairs; 12.202 duplicate pair groups, 16.037 surplus records, 8.993 questions có distinct outputs. Pipeline cũ train/validation có 5 shared questions. `Audit report` (đã xóa; xem Git lịch sử) là bằng chứng trước group split.
 - **Files/functions từng sửa:** config (test size/manifest path); data_prep (`normalize_whitespace`, `allocate_quota`, `build_manifest`, `load_or_create_manifest`, `cached_revision`, `prepared_from_manifest`, `prepare_data`, hash helpers); tests và report. `format_batch` giữ nguyên theo AST comparison đã báo.
 - **Implemented policy:** whitespace-only pair identity, representative index nhỏ nhất; distinct outputs giữ cùng question group; Hamilton quotas trên 13 source-combination strata, test trước validation; SHA256 ordering; 3% sampling theo representative source.
 - **Actual counts:** 246.002 distinct pairs sau bỏ 16.037 duplicates; train pool 245.309 records/223.860 groups; selected train 7.359; validation 100 groups/108 all refs/100 primary; test 500 groups/585 all refs. Selected train CoT/PoT 5.181/2.178; validation primary 69/31; test primary 346/154.
 - **Commands:** Conda project `python -m unittest discover -s tests -v`; offline `PYTHONPATH=. python tests/verify_real_data.py` (harness từ /tmp khi kiểm chứng); formatter AST/source hashes; `git diff --check`.
 - **Reported PASS:** bảy unit cases; hai complete real preparations có cùng manifest bytes/hash, ordered subset, train/validation text hashes và test-reference hashes; snapshot/settings mismatch fail; zero normalized-question overlap; text-only schema compatible. Harness đầu fail do datasets.Column không JSON serializable, sửa thành list rồi rerun PASS.
-- **Provenance:** revision `b4fdc323a7be1379c9c7c0b67b1de72dfee2111a`; snapshot hash `6b438786f5ef69c39ac752b4d6eb7ccbfbfd69787ea61047f4a30702a475cc1a`; manifest file SHA256 `b83ac64a3ea90090a11b12febba9d645bd2e7c1406eabd282bfa70ca90411647`, 115.897.944 bytes. [Report](data_preparation_report.json); [local manifest](../data/split_manifest.json), Git ignored.
+- **Provenance:** revision `b4fdc323a7be1379c9c7c0b67b1de72dfee2111a`; snapshot hash `6b438786f5ef69c39ac752b4d6eb7ccbfbfd69787ea61047f4a30702a475cc1a`; manifest file SHA256 `b83ac64a3ea90090a11b12febba9d645bd2e7c1406eabd282bfa70ca90411647`, 115.897.944 bytes. `Report` (đã xóa; xem Git lịch sử); [local manifest](../data/split_manifest.json), Git ignored.
 - **Acceptance/limits:** DONE theo exact normalized equality/determinism; không semantic leakage proof, không đánh giá correctness references. Full rebuild CPU/RAM, PoT indentation normalization và source representative còn mở; không GPU training.
 
 ### Task 3A — analysis sau Task 2
 
 - **Approval:** user chỉ cho analysis, không production changes/training/test tuning. Task 3A DONE không cấp approval cho proposal.
-- **Files/functions:** thêm [analyze_task3a.py](../src/analyze_task3a.py): `representation`, `stats`, `summarize`, `verify`, `main`; generated [task3a_analysis_report.json](task3a_analysis_report.json); cập nhật tracker cũ.
+- **Files/functions:** thêm `analyze_task3a.py` (đã xóa; xem Git lịch sử): `representation`, `stats`, `summarize`, `verify`, `main`; generated `task3a_analysis_report.json` (đã xóa; xem Git lịch sử); cập nhật tracker cũ.
 - **Command đã PASS:** `PYTHONDONTWRITEBYTECODE=1 /home/nhan/miniconda3/envs/math-instruct-llama/bin/python -B -m src.analyze_task3a > /tmp/task3a-analysis.log 2>&1`. Offline CPU, tokenizer local-only; Arrow paths lấy từ report Task 1, toàn snapshot hashes đối chiếu manifest.
 - **Scope:** đúng 7.359/100 ordered selections, không test metrics; current vs chat template, fixed date `09 Oct 2026`; prompt/answer/total min/median/p90/p95/p99/max và CoT/PoT riêng; năm lengths 128/256/512/1024/2048.
 - **Current train total:** median/p95/p99/max 192/632/939,84/2.126; chat 219/659,10/967,42/2.154. Chat validation max 926; current 898. Answer lengths không đổi giữa hai formats.
@@ -159,7 +159,7 @@ Training time kế hoạch: trước train đến sau final save, CUDA synchroni
 
 Khi xóa scripts sẽ mất entry point tái tạo reports tương ứng; phải ghi tác động và giữ regression/evidence trước approval cleanup. Migration này không cleanup.
 
-**Task tiếp theo:** user review migration tài liệu và kết quả Task 3A. Sau đó mới lập/duyệt plan Task 3B với files/functions, acceptance và tests cụ thể. Chưa implementation 3B, chưa chọn max length/truncation policy, chưa GPU runs.
+**Task tiếp theo:** review consolidated handoff ở section 9; chỉ session sau, sau approval, mới triển khai các hạng mục BLOCKER/REQUIRED theo dependencies. Không tự chạy GPU hoặc chuyển Task 3C.
 
 ## 8. Migration record — 2026-10-09
 
@@ -169,3 +169,163 @@ Khi xóa scripts sẽ mất entry point tái tạo reports tương ứng; phải
 - **Verification commands:** read-only source/docs audit; Python local-link/path checks và SHA256 comparisons với `/tmp/doc-migration-before.json`; exact historical suffix comparison; `git diff --check`; whitespace checks cho cả new/untracked Markdown files.
 - **Actual results:** links/paths tồn tại; lịch sử kế hoạch cũ byte-for-byte unchanged sau notice; chỉ README/kế hoạch cũ đổi trong preexisting files, chỉ GUIDE/PROGRESS mới; source/scripts/tests/reports/manifest hashes unchanged; diff/whitespace checks PASS. Không rerun data/model tests, tải weights hoặc training.
 - **Acceptance:** migration DONE trong phạm vi tài liệu; đang chờ user review. Không đánh dấu deployment hoặc Task 3B DONE.
+
+
+## 9. Consolidated Repository Audit — Implementation Handoff
+
+> Historical handoff; user đã APPROVE implementation/cleanup trong session hiện tại. Section 10 ghi kết quả, thay thế các trạng thái TODO/approval/target tree bên dưới.
+
+Ngày: **2026-10-09**. Scope audit được user duyệt: đọc source/tests/docs/artifacts, phân tích và chỉ sửa PROGRESS. Không rerun Task 1/2/3A/3B, không training/download/cleanup/commit. Các mục đề xuất dưới đây **TODO, chưa approval implementation**; lịch sử sections 4/8 giữ nguyên.
+
+### 9.1 Current verified baseline
+
+- Working tree đã có sáu modified files từ Task 3B: config/data_prep/train/inference và hai tests cũ; `tests/test_training_format.py` untracked. Không reset/stash/overwrite chúng. HEAD `e48ea6bb633edbc52081f5147329062062ead1e9` còn pipeline cũ; checkout HEAD không phải code đã PASS 3B.
+- Lượt trước: 10/10 unittest PASS; integration PASS, selected/effective/excluded **7359/7310/49**, validation primary **100**; IDs/actual collator labels và mocked inference prompt parity **7410 samples PASS**. Audit đọc lại `/tmp/task3b-unit.log` và `/tmp/task3b-integration.log`, không chạy lại. Temp logs không phải evidence durable.
+- Local versions đọc từ installed metadata: torch 2.11.0, transformers 5.7.0, trl 1.3.0, peft 0.19.1, accelerate 1.13.0, datasets 4.8.5, bitsandbytes 0.49.2, mlflow 3.11.1. Đây là CPU environment baseline, chưa là Kaggle lockfile.
+- Manifest 115897944 bytes, revision `b4fdc323a7be1379c9c7c0b67b1de72dfee2111a`, SHA256 `b83ac64a3ea90090a11b12febba9d645bd2e7c1406eabd282bfa70ca90411647`; effective identity hash `92dc3e8c1d8be4b86d502fb4e355b5ef913896563a2eabb976579c82b11a0fc2` từ integration log. Audit hash manifest/report, không rebuild data.
+- Source chain: train.main → tokenizer → prepare_data/load_dataset → raw string schema/build_manifest (normalized pair dedup/group split/3% selection) → load_or_create_manifest → prepared_from_manifest → chat schema và measured-length exclusion → SFTTrainer preprocessing/collator → train/save. Test không được trả Trainer; full manifest rebuild có đọc test rows để integrity, không dùng test outputs tuning.
+- Exact normalized-question isolation/determinism có source và Task 2 evidence. Không chứng minh semantic leakage/pretraining contamination. PoT output whitespace normalization có thể gộp khác indentation; raw representative vẫn giữ nội dung, không đổi rule/splits trong kế hoạch này.
+- Production không đọc reports/raw Arrow paths. Integration còn đọc paths tuyệt đối từ Task 1 report, mock `load_dataset`; vì vậy PASS chưa chứng minh production Hub/cache resolver hoặc portable Kaggle loader.
+- Chat approved: fixed system/date 09 Oct 2026; tokenize=True/return_dict=False trả list, tokenize=False inference trả str; TRL internally return_dict=True lấy input_ids. BOS 128000, assistant EOT/EOS 128009, pad 128004. Prompt/pad -100; answer/EOT active; causal shift kiểm tra eligibility, chưa đo numerical loss. 1024 pilot; no packing/padding_free/assistant-only; full answer giữ hoặc sample loại rõ IDs, không bù.
+- Metadata đến từ production preparation, log_dict MLflow và final `effective_data.json`; artifact write/reload thực tế chưa chạy. Inference ưu tiên local artifact tokenizer, fallback local base cache chỉ khi thiếu tokenizer_config và fingerprint khớp; mismatch/legacy thiếu provenance fail trước weights. Hash backend/template không pin base weights revision.
+
+### 9.2 Confirmed bugs/configuration mismatches và risks
+
+| Loại | Source evidence / tác động |
+|---|---|
+| Confirmed stale tools | analyze_task3a import PROMPT_TEMPLATE đã bị gỡ → ImportError; inspect_data truy cập text và formatter answer rỗng → không còn tương thích schema. Không sửa chúng để tái chạy lịch sử. |
+| Confirmed documentation drift | GUIDE/README và tracker cũ nói plain/128/chưa approve; working source đã chat/1024/completion-only. Historical reports vẫn đúng tại thời điểm ghi, không dùng làm current run evidence. |
+| Confirmed reproducibility gap | train.main tạo adapter trước SFTTrainer nhận seed; chưa set_seed trước initialization. Dataset/base/tokenizer load không pin revision; requirements toàn unpinned. |
+| Confirmed smoke gap | CLI chỉ method, luôn một epoch trên effective dataset; không có hai-step smoke hay isolated output. Save/eval mỗi 40 steps không hoạt động cho hai-step smoke; không final evaluate bắt buộc. |
+| Confirmed serving mismatch | Existing qlora_final không effective_data.json, bị guard mới từ chối đúng chủ đích; API catch load failure nhưng health vẫn OK, unavailable 500; chưa bounds/lifespan/concurrency. Không bịa provenance cho legacy adapter. |
+| Risk: runtime | T4 thường FP16; NF4/double quant/paged optimizer/device_map=auto/kernel/VRAM chưa verified. Local import và CPU labels không chứng minh CUDA. Gradient checkpointing đang dựa SFTConfig default True và kbit helper default, kwargs None; phải explicit/nhất quán trước smoke. |
+| Risk: artifact/provenance | Metadata chỉ final save, intermediate checkpoints chưa có protocol file cho inference guard; model revision, dependency/effective config versions, sample lengths/hash và run ID chưa đầy đủ. Pipeline generation sampling 150/.7 là demo, không benchmark greedy. |
+| Risk: tests | Five manifest-only tests không cần weights; schema/chat tests cần local tokenizer và dependencies. Không có version/config guards hay training-main wiring test; tiny Trainer harness dùng overrides, chưa kiểm chứng production optimizer/model path. |
+| Risk: minimal input validation | max_length chưa validate positive/type; formatter zip có thể bỏ phần thừa nếu batched lists unequal. Current selected snapshot không có lỗi này; thêm negative regressions, không sửa counts để pass. |
+| Optional | Semantic audit, packing/FlashAttention/multi-GPU, manifest optimization, generalized schema/helper modules, removal TinyLoRA/Gradio. Không đưa vào default scope. TinyLoraConfig hiện tồn tại trong PEFT local; không coi import này là confirmed blocker. |
+
+### 9.3 Kế hoạch duy nhất: BLOCKER/REQUIRED, exact changes và gates
+
+Thứ tự **R1 → R2 → R3 → GPU approval → R4**; R5 phục vụ serving sau smoke, không chặn Kaggle. Không thêm production modules, inspection scripts hoặc plan docs. Giữ seed42/fraction.03/groups100/500/rank4/alpha8/dropout.05/LR2e-4/epoch1/accum32 cho full mode; không thay để theo best practice.
+
+| ID / priority | Exact files/functions, cách sửa tối thiểu | Dependency; acceptance/verification |
+|---|---|---|
+| R1 REQUIRED — tests/evidence/cleanup | tests/test_data_prep.py giữ bảy cases; tests/test_training_format.py giữ actual-ID/mask/parity/compatibility; tests/verify_real_data.py main bỏ dependency historical report/absolute Arrow, dùng production loader với cached/pinned revision. src/config.py/data_prep.format_batch/prepared_from_manifest validate length/input, ghi rõ selected/effective/excluded counts + stable hashes trong metadata. Không duplicate split logic. | Expected integration7359/7310/49/100, manifest hash unchanged, ordered IDs/boundary/labels/parity PASS; fresh cache missing phải fail offline. Giữ manifest-only tests chạy được không tokenizer cache; cache-required tests được xác định rõ. Chỉ cleanup sau PASS và approval riêng. |
+| R2 BLOCKER for reproducible provisioning | src/config.py thêm dataset/base revision immutable; data_prep.prepare_data/cached_revision verify requested vs resolved revision không đoán tuple path mới; train.main/inference.MathSolver.__init__ truyền cùng base/tokenizer revision và provenance. requirements.txt pin stack sau compatibility check; không sao chép CPU torch build vào Kaggle máy móc. GUIDE/README ghi setup/cache/manifest transfer và commands. | R1; revision dataset hiện có; base commit phải đọc cached snapshot metadata rồi xin duyệt nếu cần download. Mock loader asserts revision/offline behavior; wrong snapshot fail; manifest bytes và identities unchanged. Kaggle inventory/import trước weights. Không đổi dedup/manifest format. |
+| R3 REQUIRED — smoke-ready training/artifacts | src/train.py main: set_seed trước model/adapter init; thêm explicit --smoke chọn deterministic prefix effective IDs, hai optimizer steps, output riêng tránh legacy/final overwrite; giữ full mode HP. Explicit precision/checkpointing/use_cache, cùng kwargs kbit+Trainer; T4 FP16 candidate, chưa VRAM guarantee. Log versions/revisions/protocol/effective config/IDs/resource timings/trainable count trong existing MLflow run; final evaluate/save/tokenizer/effective metadata bắt buộc. inference loader verify base revision; stop/prompt không đổi. | R2; thêm regressions vào existing test_training_format.py cho production config/wiring bằng mocks, không train full. Smoke cannot accidentally select test/full run; seed before init; isolated save/load protocol; final eval called even <40 steps; MLflow metrics/artifact roundtrip bằng temp local store. Loss/gradient/resource actual chỉ GPU R4. Intermediate checkpoints: rõ scope chưa phục vụ hoặc metadata cùng save; không silently claim compatible. |
+| R4 BLOCKER gate — Kaggle GPU smoke | Existing train CLI và inference CLI, GUIDE/PROGRESS/requirements actual tested versions. Không thêm GPU inspection script. Inventory CUDA/GPU/dependencies; authorized LoRA và QLoRA riêng, hai steps; save/reload/generate; record effective settings/artifacts/run. | User approval chạy GPU/model access riêng. Finite loss, adapter update/gradients, base frozen, actual four-bit QLoRA, positive supervised targets, correct reload/stops; peak allocated/reserved/time GPU identity và final validation trong MLflow. Không full training hoặc test tuning. Chỉ chốt tested dependency stack khi evidence PASS. |
+| R5 REQUIRED for serving later | app.py lifespan/readiness503/unavailable503/request bounds/safe errors/serialized generation; inference error bounds nếu cần; Dockerfile bỏ duplicate install và chọn mounts artifact/cache thay COPY unknown legacy models; .dockerignore tương ứng. Tests thêm API cases vào existing test file hoặc một API test file chỉ khi scope riêng duyệt. | R4 verified adapter; mocked API tests rồi real runtime/container test trên host phù hợp. Không bắt Docker/UI/evaluator hoàn thiện mới được smoke. |
+
+Tests bổ sung phải kiểm tra contract, không mirror functions. Config wiring/MLflow/temp artifact tests bổ sung vào tests hiện có; không một helper/module cho mỗi check. Evaluator/base baseline vẫn roadmap Task4, không lén triển khai trong smoke handoff.
+
+### 9.4 Cleanup inventory / target tree
+
+**Các classifications là đề xuất, không hành động đã được duyệt.**
+
+| Files | Action / lý do và replacement |
+|---|---|
+| src/__init__.py | KEEP empty package marker |
+| src/config.py, data_prep.py, train.py, inference.py | MODIFY theo R1–R3; mỗi file một responsibility, shared build_prompt/provenance trong data_prep, không production module mới |
+| src/inspect_data.py | DELETE sau PASS: one-off statistics/duplicates/full-sequence labels, schema đã stale; manifest tests và actual-label regressions/integration thay current safety checks. Mất CLI tái tạo historical reports ở checkout mới; giữ source/evidence commit cũ, không hứa reports mới bằng code mới. |
+| src/analyze_task3a.py | DELETE sau PASS: one-off lengths/tensor evidence, import stale; existing tests thay boundary/labels/filter/parity, metrics giữ historical summary. Mất analysis CLI/current length sweep; dùng archived commit để tái tạo lịch sử, không cần giữ inspection trong runtime. |
+| tests/test_data_prep.py, tests/test_training_format.py | MODIFY/KEEP; không xóa tests có giá trị; thêm untracked test vào review scope của session sau |
+| tests/verify_real_data.py | MODIFY/KEEP explicit cache-required integration, không writes reports; bỏ absolute paths và mock loader gap; không merge vào quick unittest discovery vì rất nặng |
+| docs/data_inspection_report.json, data_duplicates_report.json, data_preparation_report.json | KEEP historical evidence; không current runtime dependency, không regenerate/overwrite. Chỉ xem xét archive/remove trong approval tương lai khi Git retrieval và portable integration thay thế đã verified. |
+| docs/task3a_analysis_report.json | MODIFY compact cùng path sau approval: metrics/definitions/provenance/status/scope/counts/hash; bỏ arrays/tensors và raw-index lists dài. Full blob SHA256 `48010545ecba8d8823cfb307250a1bd0c57e0e82d26151611b8bcba15ce15378`, 12269922 bytes tại commit e48ea6bb633edbc52081f5147329062062ead1e9; verify bytes trước replacement. Không rewrite Git history. |
+| docs/GUIDE.md, docs/PROGRESS.md, README.md | MODIFY sau implementation; hai docs chủ đạo, README short; merge durable /tmp verification facts vào PROGRESS, không tạo audit report riêng |
+| docs/IMPLEMENTATION_PLAN.md | KEEP historical notice; không update/delete; archive move optional sau approval, chưa cần thêm archive directory |
+| app.py, Dockerfile, .dockerignore | MODIFY R5 sau smoke; giữ entry points hiện có |
+| requirements.txt | MODIFY R2/R4; CUDA stack tested != local CPU stack |
+| .gitignore, .vscode/settings.json | KEEP; data/models/mlruns/env/pycache already ignored, IDE config nhỏ không runtime dependency |
+| data/split_manifest.json; models/*; mlruns/*, mlruns.db; caches | GENERATED-IGNORED, giữ artifacts có provenance/không xóa legacy; explicit transfer/version hashes cho Kaggle. Không force-add; avoid copying weights/tokenizer cache vào Git. |
+
+Target (không tạo thêm file trong audit):
+
+```text
+README.md, requirements.txt, app.py, Dockerfile, .gitignore, .dockerignore
+.vscode/settings.json
+src/{__init__.py,config.py,data_prep.py,train.py,inference.py}
+tests/{test_data_prep.py,test_training_format.py,verify_real_data.py}
+docs/{GUIDE.md,PROGRESS.md,IMPLEMENTATION_PLAN.md}
+docs/{data_inspection_report.json,data_duplicates_report.json,data_preparation_report.json,task3a_analysis_report.json}
+data/split_manifest.json                     # ignored, preserve
+models/<isolated-run>/{adapter*,tokenizer*,chat_template*,effective_data.json} # ignored
+mlruns/, mlruns.db                           # ignored
+```
+
+MERGE chỉ knowledge/assertions còn cần vào existing tests/PROGRESS; không merge entire analysis code vào runtime. Bốn reports giữ vai trò historical; Task3A summary không current benchmark result.
+
+### 9.5 Verification commands, decisions và next-session instructions
+
+Audit commands: git status/ls-files/status --ignored; cat/sed toàn relevant source/tests/docs/config; JSON parse/hash reports/manifest; installed metadata và đọc SFTConfig/PEFT defaults; đọc baseline logs. Không deserialize training_args.bin, load weights hoặc chạy lại analysis. Scope integrity: chỉ PROGRESS mới sửa trong audit; các modified/untracked files trước audit là Task3B, không nhận là thay đổi audit.
+
+Commands session sau (từ root, project Conda; offline flags HF_HUB_OFFLINE=1/HF_DATASETS_OFFLINE=1/CUDA_VISIBLE_DEVICES='' và PYTHONDONTWRITEBYTECODE=1):
+
+- `python -B -m unittest discover -s tests -v` — CPU contract tests; existing baseline10, bổ sung cases có mục đích.
+- `PYTHONPATH=. python -B tests/verify_real_data.py` — once sau changes; portable cached loader, same hash/counts, all7410 actual labels/parity, no historical writes.
+- `git diff --check` + links/paths + SHA256 preserved files/blob; version inventory và loader mocks, no pretrained weights local.
+- Future GPU command **chỉ sau R3 implementation và approval riêng**: `python -m src.train --method lora --smoke`, rồi qlora; flag chưa tồn tại hôm nay. Save/reload/generation qua existing CLI. Không gọi current train CLI như smoke.
+
+Decisions cần user duyệt: R1–R3 implementation scope và cleanup gates; delete hai scripts/compact report; dataset/base immutable revision và Kaggle provisioning/download; explicit checkpointing policy (đề xuất giữ True, kwargs thống nhất sau compatibility review); isolated smoke prefix size/accumulation runtime (hai steps vẫn accum32 hay override riêng cho smoke, phải explicit approval); MLflow measurement boundaries; GPU runs riêng. 1024 giữ approved pilot, không nâng2048/tune LR. API/Docker R5 chưa triển khai cùng preparation/training nếu không scope riêng.
+
+Session mới: đọc section này + relevant diff, không audit lại toàn repo; giữ Task3B working changes; trình exact delta/approval trước code. Implement R1–R3 tuần tự theo approved scope; tests FAIL thì tìm root cause, không đổi expected7359/7310/49 để pass, không cleanup evidence. Sau tests PASS và cleanup approval mới delete/compact, update GUIDE/PROGRESS/README rồi dừng review. Không tự GPU/full training/commit/push/Task4. Optional improvements để riêng. Handoff này **TODO**; audit hoàn tất không đồng nghĩa repository Kaggle-ready.
+
+## 10. Approved Implementation — 2026-10-09
+
+**Approval/scope:** user APPROVE toàn BLOCKER/REQUIRED trong handoff và cleanup sau PASS, thay đề xuất giữ historical JSON reports. Đã triển khai code CPU-verifiable R1/R2/R3 và fixes R5; R4 actual GPU smoke vẫn chưa được phép/chưa chạy. Không tạo kế hoạch mới, tải pretrained weights, chạy GPU/full training, commit/push hoặc deployment. Giữ nguyên working changes Task3B có sẵn.
+
+### Implementation thực tế
+
+- **Revisions/provenance:** dataset pin `b4fdc323a7be1379c9c7c0b67b1de72dfee2111a`, base/tokenizer pin `5a8abab4a5d6f164389b1079fb721cfab8d7126c`, đối chiếu cached snapshot/refs. Loaders truyền revisions; dataset source URI metadata phải đúng revision, không suy từ Arrow paths. Offline latest-cache fallback bị source revision + manifest checks chặn. Pin direct dependencies theo installed metadata/imports/contracts, không tự chọn torch CUDA wheel/index/image. Requirements không phải transitive/CUDA lockfile.
+- **Data safety:** validate positive integer max_length và equal batched lengths; giữ split/dedup/sampling/chat/date/token IDs/masking. Metadata thêm counts, effective IDs hash và token lengths/hash, không thay manifest/effective IDs. `python -m src.data_prep` tạo metadata trong gitignored data; integration không đọc/ghi historical reports.
+- **Training:** `set_seed(42)` trước model/adapter init; một visible CUDA GPU bắt buộc. Smoke deterministic first64 effective records, microbatch1/accum32 không đổi, `max_steps=2`; explicit final step guard, không scheduled save/eval nhưng final validation toàn100 bắt buộc. Full-mode epoch1/LR/rank/alpha/dropout/accum/scheduler/warmup giữ nguyên. Smoke warmup5 nên step1 LR0, step2 vẫn có update trên tiny CPU test. Mỗi run output UUID riêng, không overwrite legacy/full outputs.
+- **LoRA/QLoRA:** FP16 nếu không BF16-capable, BF16 nếu hỗ trợ; use_cache=False, checkpointing=True/use_reentrant=False đồng nhất kbit/Trainer. QLoRA NF4/double quant/compute dtype, explicit single-GPU device map thay auto offload trong training; kiểm tra loaded-in-4bit, chỉ adapter trainable, finite gradients/loss và positive adapter update norm smoke. Đây là runtime guards, không actual CUDA evidence.
+- **MLflow/artifacts:** một explicit run, report_to=none tránh duplicate integration; callbacks log Trainer/gradient metrics và save tokenizer/protocol tại checkpoints. Final evaluate/save/tokenizer/provenance/upload bắt buộc. Metadata ghi identities/revisions/dependencies/effective config/precision/method/GPU/CUDA/run ID; resource hooks đo train+final eval (không load/save), peak allocated/reserved. Adapter config pin base revision. Inference explicit artifact path, verifies tokenizer/backend/template/IDs/revisions/method/config trước load; saved precision, use_cache=True/eval, cùng prompt/EOT, optional greedy. Không giả provenance cho legacy adapter.
+- **R5 fixes:** API lifespan, explicit env artifact path, readiness/unavailable503, bounded requests422, sanitized500, generation lock. Docker bỏ duplicate installs/COPY models, yêu cầu user-supplied verified PyTorch runtime image và mount artifacts/cache. API ASGI mock tests PASS; Docker build/real GPU serving chưa chạy.
+
+### Verification thực tế
+
+Môi trường Python3.10 Conda `/home/nhan/miniconda3/envs/math-instruct-llama/bin/python`; HF_HUB_OFFLINE=1/HF_DATASETS_OFFLINE=1/CUDA_VISIBLE_DEVICES='' / PYTHONDONTWRITEBYTECODE=1. Local torch **2.11.0+cu130**, CUDA build13.0 nhưng không GPU driver. Dataset cache copy từ existing cache vào `/tmp/math-instruct-hf/datasets` (HF_DATASETS_CACHE) do original cache read-only/loader cần lock; không hardcode trong integration, không downloads.
+
+Commands chạy từ root:
+
+```bash
+python -B -m unittest discover -s tests -v
+PYTHONPATH=. python -B tests/verify_real_data.py
+git diff --check
+python -m pip check
+```
+
+- **Unit tests PASS: 16/16.** Manifest/split/schema/actual collator/parity/boundary/negative inputs; pinned loader/missing offline cache/wrong resolved revision; production SFTConfig và LoRA/QLoRA main wiring mocks; seed-before-init và deterministic random initialization; actual tiny random CPU adapter training đúng2 optimizer steps, finite loss và adapter update; real random adapter save/load + production tokenizer/protocol save/load; temporary SQLite MLflow metric/artifact round-trip. Không pretrained model weights.
+- **Real-data integration PASS:** production pinned cached loader, manifest rebuild + byte preservation; selected/effective/excluded/validation **7359/7310/49/100**, ordered selections và primary references giữ nguyên. **7410** actual-label samples PASS: IDs/BOS/EOT, full-answer boundaries, completion mask, prompt/pad -100, supervised answer targets, inference rendered-token parity. Manifest SHA256 `b83ac64a3ea90090a11b12febba9d645bd2e7c1406eabd282bfa70ca90411647`; effective IDs hash `92dc3e8c1d8be4b86d502fb4e355b5ef913896563a2eabb976579c82b11a0fc2`. Integration khóa assertions cho hashes/token IDs này, không đổi expectations để pass.
+- **Static/final checks PASS:** git diff --check; AST và source module import paths; actual CPU imports qua tests/CLI help; local Markdown links; no stale inspection/report/Arrow loader imports trong runtime/tests; gitignore data/models/MLflow DB/WAL/SHM/artifacts; final source/test/docs tree. Historical implementation plan byte-for-byte identical to HEAD, SHA256 `d37f05adbceea919b5f1f4e20aeae3df37e72ce58c400d421bac2942f9c08db0`.
+- **Dependency check FAIL (existing environment):** boto3 1.43.0 requires botocore>=1.43.0,<1.44.0; installed botocore1.42.91. Không thay installed env hoặc thêm speculative AWS pins; repo dùng local MLflow, round-trip PASS. Fresh environment/pip resolution/S3 cần verify riêng; không tuyên bố toàn dependency env clean.
+- **Test harness limits:** TestClient cross-thread portal bị treo trong restricted sandbox; stopped và chuyển HTTP mocks sang httpx ASGITransport/lifespan cùng event loop, inline sync dispatch được mock. HTTP200/422/500/503, lifecycle và lock ownership PASS; real threadpool/concurrency load chưa verified. Tiny CPU smoke thay precision/optimizer/checkpointing để chạy offline; không chứng minh CUDA paged optimizer/NF4/VRAM. Production configs/wiring kiểm tra riêng bằng mocks. Không GPU numerical loss/reload tolerance/generation evidence.
+
+### Cleanup và final repository
+
+Sau CPU/unit/integration PASS, xóa **hai scripts** `src/inspect_data.py`, `src/analyze_task3a.py`: schema/import stale; current correctness checks đã chuyển sang retained tests/integration. Xóa **cả bốn JSON reports**, không compact/replace bằng report mới:
+
+| Deleted historical file | Lý do | SHA256 trước xóa |
+|---|---|---|
+| data_inspection_report.json | Plain/full-sequence pipeline cũ, absolute Arrow paths; không current runtime dependency hoặc portable regeneration | 8b381ebebcf35cbbf6350275caf14bdcd1baaf829b75b20c2bff44ace08ac80c |
+| data_duplicates_report.json | Pre-fix duplicate/leakage analysis; durable summary + current split tests đủ dùng | 23e9d247a2924666c53d50391ef17e4859c03d35a65f88ec0ab2c55368d0684a |
+| data_preparation_report.json | Historical generated duplicate of reproducible manifest/integration facts, không cần giữ report riêng | c111d3cc71c3151ec6d290c7cbfdaa4caaccf2827cf8601292fcb0fbc4370e28 |
+| task3a_analysis_report.json | One-off length/tensor arrays12MB, obsolete analysis CLI; current labels/length policy đã có regressions | 48010545ecba8d8823cfb307250a1bd0c57e0e82d26151611b8bcba15ce15378 |
+
+Summary lịch sử ở sections4/9 và Git vẫn giữ; files có tại commit `e48ea6bb633edbc52081f5147329062062ead1e9`. Không hứa tái tạo reports cũ bằng code hiện tại, không rewrite history. Không tạo/commit reports phân tích mới, không xóa manifest hoặc legacy generated models. Historical broken links chuyển thành text; GUIDE/README viết lại theo source hiện tại.
+
+Modified: `.gitignore`, `.dockerignore`, `Dockerfile`, `app.py`, `requirements.txt`, `README.md`, `docs/GUIDE.md`, `docs/PROGRESS.md`, `src/{config,data_prep,train,inference}.py`, `tests/{test_data_prep,verify_real_data}.py`. Retained/extended new working-tree test: `tests/test_training_format.py` (đã tồn tại untracked từ Task3B, session này không tạo production module mới). Deleted sáu files trên. Historical plan và package marker giữ nguyên.
+
+```text
+README.md  requirements.txt  app.py  Dockerfile  .gitignore  .dockerignore
+.vscode/settings.json
+src/{__init__,config,data_prep,train,inference}.py
+tests/{test_data_prep,test_training_format,verify_real_data}.py
+docs/{GUIDE,PROGRESS,IMPLEMENTATION_PLAN}.md
+data/      models/      mlruns/      mlruns.db*          # generated, ignored
+```
+
+**Còn cần GPU thật:** chốt compatible torch/CUDA/driver/bitsandbytes stack + clean pip check; LoRA và QLoRA smoke riêng, mỗi2 steps; actual NF4/paged optimizer, finite real loss/gradients/update/frozen base, VRAM/time hooks; save/reload/generate và numerical tolerance trên same settings; real API serving và Docker host/image. Kaggle provisioning/copy/cache missing behavior trên fresh host vẫn cần verify. Answer evaluator/base-only benchmark/test scoring/UI nằm ngoài implementation smoke scope, không tự mở Task4/deployment.
+
+Lệnh future sau GPU/model-access approval: `CUDA_VISIBLE_DEVICES=0 python -m src.train --method lora --smoke`, rồi qlora; inference `--adapter-path <printed-final-path> --greedy`. Commands đầy đủ/cache/setup/limits ở GUIDE. Implementation CPU scope và cleanup hoàn tất; chờ user review, không tự GPU/full run.

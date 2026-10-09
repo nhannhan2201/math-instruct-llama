@@ -1,18 +1,15 @@
-# --- Deep Learning & Model ---
-torch
-transformers
-peft
-trl
-bitsandbytes
-datasets
-huggingface_hub
-
-# --- Web API & Server (Mới thêm) ---
-fastapi
-uvicorn
-pydantic
-gradio
-
-# --- Tracking & MLOps ---
-mlflow
-# dvc[gdrive]
+# CPU/offline verified Python 3.10 environment; not a validated CUDA lockfile.
+# Install/verify a GPU-compatible torch separately on Kaggle before this file.
+# Local torch 2.11.0; CUDA wheel/index selection remains a GPU verification gate.
+transformers==5.7.0
+peft==0.19.1
+trl==1.3.0
+accelerate==1.13.0
+bitsandbytes==0.49.2
+datasets==4.8.5
+huggingface_hub==1.12.2
+mlflow==3.11.1
+fastapi==0.136.1
+uvicorn==0.46.0
+pydantic==2.13.3
+gradio==6.13.0

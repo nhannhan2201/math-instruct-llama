@@ -9,6 +9,8 @@ data/
 models/
 mlruns/
 mlruns.db
+mlruns.db-shm
+mlruns.db-wal
 
 # OS
 .DS_Store

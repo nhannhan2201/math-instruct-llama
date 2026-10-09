@@ -14,4 +14,7 @@ mlruns/
 mlruns.db
 data/
 
-# CHÚ Ý: KHÔNG ignore thư mục models/ ở đây vì Docker CẦN copy model vào để chạy API!
+# Artifacts are mounted at runtime, never baked into the image.
+models/
+tests/
+docs/
