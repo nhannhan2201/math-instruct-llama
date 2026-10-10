@@ -13,6 +13,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from textwrap import dedent
 import zipfile
 from datetime import datetime, timezone
 from urllib.parse import urlparse, unquote
@@ -108,13 +109,13 @@ def main(argv=None):
     (SESSION / 'source.json').write_text(json.dumps({'url': git('remote','get-url','origin'), 'head': HEAD}, indent=2))
     ENV = dict(os.environ, CUDA_VISIBLE_DEVICES='0', PYTHONUNBUFFERED='1')
     RUNS = {}
-    preflight = """
+    preflight = dedent("""
     import json, torch
     import transformers, trl, peft, accelerate, datasets, bitsandbytes, mlflow, huggingface_hub
     from importlib.metadata import version
     assert torch.cuda.is_available() and torch.cuda.device_count() == 1, 'Need one visible CUDA GPU'
     print(json.dumps({'dependencies': {p: version(p) for p in ('torch','transformers','trl','peft','accelerate','datasets','bitsandbytes','mlflow','huggingface_hub')}, 'gpu': torch.cuda.get_device_name(0), 'cuda': torch.version.cuda, 'native_bf16': torch.cuda.is_bf16_supported(including_emulation=False)}, indent=2))
-    """
+    """)
     run_logged([sys.executable, "-c", preflight], "preflight", ENV)
     for method in ('lora', 'qlora'):
         smoke(method)

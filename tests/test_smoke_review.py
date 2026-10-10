@@ -10,6 +10,23 @@ from src import smoke_review as review
 
 
 class SmokeReviewTests(unittest.TestCase):
+    def test_preflight_python_c_source_compiles(self):
+        # Exercise main's actual command construction, not a duplicate snippet.
+        class StopAfterPreflight(Exception):
+            pass
+
+        def capture(command, name, env):
+            self.assertEqual(name, 'preflight')
+            self.assertEqual(command[1], '-c')
+            compile(command[2], '<preflight>', 'exec')
+            self.assertIn('including_emulation=False', command[2])
+            raise StopAfterPreflight
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(review, 'git', side_effect=lambda *args: '' if args[0] == 'status' else 'test-head'), patch.object(review, 'run_logged', side_effect=capture):
+                with self.assertRaises(StopAfterPreflight):
+                    review.main(['--output-dir', tmp])
+
     def test_metrics_and_artifacts_from_real_mlflow(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

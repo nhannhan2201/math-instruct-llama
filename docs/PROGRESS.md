@@ -429,3 +429,7 @@ CLI chạy hai smoke/reload từ cùng clean HEAD, đọc `MlflowClient.get_run/
 Retained regression `tests/test_smoke_review.py`: actual local SQLite MLflow run/artifact round-trip, metrics hiển thị thay đổi đúng khi MLflow metrics thay đổi; reject zero update/FAILED/artifact mismatch. GPU verification vẫn pending; section16 notebook implementation đã được thay thế bởi luồng này. GUIDE cập nhật; không xóa notebook output evidence cũ.
 
 Verification actual: `/home/nhan/miniconda3/envs/math-instruct-llama/bin/python -m unittest discover -s tests -p test_smoke_review.py -v` PASS (1 regression, actual SQLite MLflow/API/artifact round-trip, 2.900s); notebook 3 code cells AST/cleared outputs PASS; `git diff --check` PASS. Không chạy GPU smoke, Kaggle installation/network hoặc export ZIP end-to-end trong lượt này.
+
+### Preflight indentation fix — 2026-10-10
+
+User Kaggle traceback tại CLI preflight: multiline `python -c` source giữ indentation của main, gây IndentationError trước training. Fix dùng textwrap.dedent ngay khi tạo preflight; regression gọi main, capture đúng command và compile source thực tế. Smoke-review regressions 2/2 PASS local (actual SQLite round-trip + preflight command), diff check PASS. Không GPU/full training hoặc thay training/data config. Notebook rút gọn 3 cells cũng được đưa vào cùng follow-up. Kaggle cần pull main rồi gọi CLI lại, không patch notebook/source tại runtime.
