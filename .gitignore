@@ -14,3 +14,6 @@ mlruns.db-wal
 
 # OS
 .DS_Store
+
+# Downloaded training artifact
+/results.zip
