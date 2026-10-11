@@ -107,21 +107,35 @@ class MathSolver:
 
         return result[0]["generated_text"].strip()
 
-# --- Đoạn code test nhanh (Chỉ chạy khi bạn gọi trực tiếp file này) ---
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Test inference mô hình đã train")
-    parser.add_argument(
-        "--method",
-        type=str,
-        choices=["lora", "qlora", "tinylora"],
-        default="qlora",
-        help="Chọn phương pháp model bạn muốn test"
-    )
+# Manual demo questions, independent of held-out test; no automated scoring.
+DEMO_QUESTIONS = (
+    ("Unit price", "If 3 apples cost 90 cents, how much do 5 apples cost?", "$1.50"),
+    ("Linear equation", "Solve for x: 3*x - 7 = 20.", "x = 9"),
+    ("Fractions", "A tank is 3/5 full. After adding 18 liters, it is 9/10 full. What is the tank's total capacity?", "60 liters"),
+    ("Quadratic equation", "A rectangle has area 96 square centimeters. Its length is 4 centimeters greater than its width. Find its width and length.", "Width 8 cm, length 12 cm"),
+    ("Probability", "A bag contains 5 red and 4 blue balls. Three balls are drawn uniformly at random without replacement. What is the probability that exactly two are red? Give an exact fraction.", "10/21"),
+)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Manual inference demo; not held-out evaluation")
+    parser.add_argument("--method", choices=["lora", "qlora", "tinylora"], default="qlora")
     parser.add_argument("--adapter-path", required=True, help="Explicit final/checkpoint artifact directory")
     parser.add_argument("--greedy", action="store_true")
-    args = parser.parse_args()
-
+    parser.add_argument("--demo-suite", action="store_true", help="Five questions of increasing complexity")
+    parser.add_argument("--max-new-tokens", type=int, default=150)
+    args = parser.parse_args(argv)
+    if args.max_new_tokens <= 0:
+        parser.error("--max-new-tokens must be positive")
     solver = MathSolver(method=args.method, adapter_path=args.adapter_path)
-    test_q = "If 3 apples cost 90 cents, how much do 5 apples cost?"
-    print(f"\nHỏi: {test_q}")
-    print(f"Đáp: {solver.solve(test_q, do_sample=not args.greedy)}")
+    questions = DEMO_QUESTIONS if args.demo_suite else DEMO_QUESTIONS[:1]
+    print(f"Method: {args.method}; adapter: {args.adapter_path}; greedy: {args.greedy}")
+    for index, (topic, question, reference) in enumerate(questions, 1):
+        print(f"\n[{index}/{len(questions)}] {topic}\nHỏi: {question}", flush=True)
+        answer = solver.solve(question, max_new_tokens=args.max_new_tokens, do_sample=not args.greedy)
+        print(f"Đáp: {answer}\nExpected final answer (manual review): {reference}", flush=True)
+    print("Manual demo only; no accuracy score or held-out test evaluation.")
+
+
+if __name__ == "__main__":
+    main()

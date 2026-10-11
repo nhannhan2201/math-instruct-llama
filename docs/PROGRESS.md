@@ -1,6 +1,6 @@
 # Math Instruct Llama — Progress
 
-Cập nhật: **2026-10-10**. **Session mới đọc section 17 và section 15 trước để lấy trạng thái mới nhất; sections 4–14 là lịch sử theo thời điểm.** Nguồn chính cho roadmap, approvals, task status và verification records. Code thực tế được giải thích trong [GUIDE.md](GUIDE.md). [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) giữ nguyên lịch sử trước migration, không tiếp tục cập nhật.
+Cập nhật: **2026-10-11**. **Session mới đọc section 19 để lấy trạng thái mới nhất; sections 4–17 là lịch sử theo thời điểm.** Nguồn chính cho roadmap, approvals, task status và verification records. Code thực tế được giải thích trong [GUIDE.md](GUIDE.md). [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) giữ nguyên lịch sử trước migration, không tiếp tục cập nhật.
 
 ## 1. Quy trình bắt buộc
 
@@ -14,7 +14,7 @@ Mỗi task record ghi ngày, approval/scope, files/functions, commands/environme
 
 ## 2. Task hiện tại và approval gates
 
-**Task hiện tại: hoàn tất documentation handoff sau user-run Kaggle GPU smoke.** Implementation/cleanup đã hoàn tất; source fixes đã commit/push theo approval sau đó. Kết quả mới nhất ở section 15. User đã chạy GPU smoke, không có local GPU training do agent thực hiện. Không tự chạy full training hoặc deployment; không mở lại audit/kế hoạch hoặc dependency work đã bị user dừng.
+**Task hiện tại: GPU smoke MLflow đã VERIFIED (section18), chuẩn bị full-training runbook để user review.** GUIDE có lệnh Kaggle/checkpoint/MLflow/export giữ nguyên config. Chưa có approval chạy full training; không chạy full/evaluator/deployment hoặc mở lại dependency work. Kết quả smoke cũ giữ ở section15, evidence mới ở section18.
 
 | Nội dung | Approval/status |
 |---|---|
@@ -43,7 +43,7 @@ TODO = chưa thực hiện; IN PROGRESS = còn acceptance chưa đạt; BLOCKED 
 | 4A — Evaluator | TODO | Chưa có answer evaluator |
 | 4B — Shared inference | IN PROGRESS | Real QLoRA905/LoRA73d reload + greedy demo PASS; latest LoRA607 reload, numerical tolerance và base-only còn mở |
 | 5A — Kaggle readiness | IN PROGRESS | T4/FP16 stack chạy cả hai smoke PASS; torchao workaround và global pip conflicts, chưa clean setup proof |
-| 6 — Tracking/resources | IN PROGRESS | CPU round-trip PASS; GPU logging/save flow hoàn tất, chưa inspect downloaded MLflow metrics/VRAM |
+| 6 — Tracking/resources | VERIFIED (GPU smoke scope) | Section18: actual SQLite metrics/artifact hashes/VRAM/export/local restore PASS; full-run tracking chưa VERIFIED |
 | 5B — LoRA smoke | IN PROGRESS | Latest905 train2/2 + validation100/100 + save PASS; old73d reload PASS, latest607 reload còn mở |
 | 5C — QLoRA smoke | IN PROGRESS | 905 GPU train2/2 + validation100/100 + save/reload/greedy PASS; numerical tolerance/resource evidence còn mở |
 | 7A — Validation/protocol lock | TODO | Chưa baseline/pilot/locked config |
@@ -433,3 +433,72 @@ Verification actual: `/home/nhan/miniconda3/envs/math-instruct-llama/bin/python 
 ### Preflight indentation fix — 2026-10-10
 
 User Kaggle traceback tại CLI preflight: multiline `python -c` source giữ indentation của main, gây IndentationError trước training. Fix dùng textwrap.dedent ngay khi tạo preflight; regression gọi main, capture đúng command và compile source thực tế. Smoke-review regressions 2/2 PASS local (actual SQLite round-trip + preflight command), diff check PASS. Không GPU/full training hoặc thay training/data config. Notebook rút gọn 3 cells cũng được đưa vào cùng follow-up. Kaggle cần pull main rồi gọi CLI lại, không patch notebook/source tại runtime.
+
+## 18. Actual GPU smoke MLflow VERIFIED và full-training runbook — 2026-10-10
+
+User APPROVED cập nhật GUIDE/PROGRESS và chuẩn bị hướng dẫn full LoRA/QLoRA Kaggle; giữ config hiện tại, không chạy full training/evaluator. Hai files user tải local: `smoke-review-20261010T014250450690Z.zip` (97,630,939 bytes), `smoke-pip-check.log`. ZIP SHA256 `284bfe45c392c806c7ddf3030ae75572139b4142adeef4d7ee89799f96a63a0b`, 44 archive file checksums PASS; source `f2a11f5dfb092942a796220e934c11e0652b3cc9`, T4/torch2.11.0+cu128/CUDA12.8/nativeBF16False. verification.json errors=[]; actual SQLite runs FINISHED, metrics khớp report, histories đúng2 optimizer steps; save/download hashes, metadata parity và greedy reload PASS. Hai methods selected/effective/excluded/validation7359/7310/49/100; effective IDs hash `92dc3e8c1d8be4b86d502fb4e355b5ef913896563a2eabb976579c82b11a0fc2`, trainable FP32.
+
+| Actual MLflow metric | LoRA | QLoRA |
+|---|---:|---:|
+| Run ID | db8ecec18a5a46a084751a9067d40ead | 007fe7181b6446e3a2e2acc3d0e90e9e |
+| final_eval_loss | 1.4786574840545654 | 1.4764468669891357 |
+| adapter_update_norm | 0.04051022959479571 | 0.04015107220561942 |
+| train_and_eval_seconds | 33.49800309000011 | 44.055881946 |
+| peak_allocated_bytes | 3936667648 | 3601016832 |
+| peak_reserved_bytes | 9785311232 | 8894021632 |
+| trainable_parameters | 2818048 | 2818048 |
+
+Local archive đã giải nén vào ignored `mlruns/kaggle-smoke-review-20261010/`; relocate artifact_location/artifact_uri trong bản DB local, giữ ZIP gốc; integrity_check và actual MlflowClient download provenance cho cả2 PASS. User đã mở UI để compare runs; UI HTTP200. Global pip check vẫn FAIL với preinstalled bigframes/google-colab/dopamine/moviepy/diffusers/pyopenssl conflicts; không clean-environment proof.
+
+**VERIFIED chỉ trong smoke scope:** 64 train samples/2 steps + validation100; không full7310 training, numerical reload tolerance, held-out test/answer accuracy hoặc controlled speed benchmark. Task6 GPU smoke evidence đạt; Task5B/5C save/reload/MLflow mới PASS, numerical tolerance còn mở. Sections15–17 là lịch sử; latest LoRA artifact dùng `models/lora_smoke_2c7617830aea/final`, QLoRA `models/qlora_smoke_7d66859476c1/final` trong ZIP.
+
+GUIDE thêm runbook thực hành: cùng HEAD/store, sequential full commands (bỏ --smoke), giữ epoch1/length1024/batch1/accum32/LR2e-4 và mọi config; khoảng229 steps, eval/save40/log10, giữ1 checkpoint; final không best-checkpoint tự động, CLI chưa resume. Full không log adapter_update_norm; smoke-review không dùng cho full. Backup SQLite API + store/models/checkpoints/manifest/logs ZIP sau mỗi method trước reset. Smoke memory chỉ tham khảo, chưa bound full VRAM/time/disk; không hứa ETA full từ2 steps. Runbook/export chưa thực thi full end-to-end.
+
+Next action: user review runbook và cấp approval riêng nếu muốn chạy full; không tự chạy training, evaluator hoặc thay config. Lượt này chỉ sửa GUIDE/PROGRESS, không commit/push. Validation: Markdown Python/Bash snippets syntax checks và git diff --check; không rerun GPU/unit suite vì docs-only.
+
+### Chuẩn bị notebook full riêng — 2026-10-10
+
+User yêu cầu điều chỉnh để chạy full chính xác. Added `full-training.ipynb`: lệnh repo ngắn, clone main/install/workaround/preflight, ghi HEAD, LoRA full riêng rồi backup, QLoRA full riêng rồi backup, relative download links; bash pipefail và source HEAD guard. `tune-peft.ipynb` tiếp tục dành cho smoke. Added `src/export_training.py`: chỉ backup, không chạy train, SQLite backup API/integrity + models/checkpoints/MLflow/data/logs/source HEAD/ZIP SHA256; không đánh dấu run PASS. GUIDE dùng CLI export thay cell Python dài. Không đổi src/train/config/dataset/dependency pins, không chạy full/evaluator.
+
+Tests: `python -m unittest discover -s tests -p test_export_training.py -v` 2/2 PASS (SQLite/checkpoint/artifact round-trip + missing DB guard), notebook code cells Python AST/Bash syntax PASS, git diff --check PASS. Full Kaggle runtime chưa VERIFIED. Utility/notebook cần commit/push trước user clone; chưa commit/push lượt này.
+
+### Notebook thực hành thử trước/full — 2026-10-10
+
+User yêu cầu notebook như tune-peft, thử1–2 samples trước full. Updated full-training.ipynb: markdown/code workflow setup→actual repo smoke2 steps mỗi method (64 train/100 validation)→2 inference questions với đúng smoke run IDs→manual FULL input gate→full methods/export. Không hiểu1–2 inference samples là1–2 training records, không đổi smoke/full config. Subprocess check=True, cùng HEAD/store, không model GPU trong kernel. Bỏ stale Kaggle metadata GPU/Internet=False. Syntax Python/Bash PASS; không chạy GPU/full. GUIDE cập nhật cách mở Notebook Editor nếu IDE hiển thị JSON. Chưa commit/push.
+
+### Thay thế notebook bằng lệnh repo đơn giản — 2026-10-10
+
+Theo user correction, full-training.ipynb chỉ clone/install → src.train full LoRA/QLoRA → ZIP models/MLflow DB+WAL+SHM/data và relative download. Không smoke/demo/input gate/pip-check log logic trong notebook. Train đã tự scheduled/final validation100; evaluator answer accuracy chưa có, không giả lập eval command. Removed uncommitted src/export_training.py và tests/test_export_training.py chỉ phục vụ phương án notebook bị thay thế. Các record trước là lịch sử, không còn workflow hiện tại. Không xoá evidence/log user tải. GUIDE đồng bộ. Không chạy full/config changes/commit/push.
+
+### Save Version outputs, bỏ post-training ZIP — 2026-10-10
+
+User chọn Save Version/Run All rồi tự tải outputs, không muốn ZIP/export error ảnh hưởng trạng thái version. Removed full notebook ZIP/download cells; kết thúc sau full QLoRA. GUIDE hướng dẫn tải models/mlruns/database+WAL+SHM/data trực tiếp và giữ cấu trúc. Không thay training/eval/config, không chạy full. Các workflow ZIP/full-export trước là lịch sử đã superseded. Notebook JSON/cleared outputs và git diff --check PASS.
+
+### Local smoke outputs cleanup theo user — 2026-10-10
+
+User báo đã Save Version Kaggle full và yêu cầu dọn smoke/models/mlruns local để nhận bản cuối. Removed generated models/ (legacy adapter), mlruns/ (old local store + extracted/relocated smoke archive), smoke ZIP, smoke-pip-check.log và old output notebook tune-peft.smoke-evidence.ipynb. User authorization này supersedes yêu cầu giữ evidence files cũ; run IDs/metrics/SHA256/verification records vẫn giữ ở section18/GUIDE. Giữ src/tests, smoke/full runnable notebooks và data/split_manifest.json. Không xoá Kaggle outputs hoặc thay runtime/config, không tuyên bố full thành công chỉ từ Save Version. Local smoke UI/store không còn khả dụng sau cleanup; chờ downloaded full outputs và verification mới.
+
+## 19. Kết quả full training tải về
+
+### Verification — 2026-10-11
+
+User tải results.zip (SHA256 `8f7029c18941f8dc0959fc105aff6b757545f7d310afa837a51883b519e7d500`). ZIP CRC PASS (118 entries); extract chỉ64 output files models/mlruns/database/data vào `kaggle-full-results/math-instruct-llama/`, không ghi đè source. ZIP gốc giữ nguyên. SQLite integrity PASS; hai runs FINISHED, checkpoint-229/global_step229/epoch1; training_selection full7310, validation100, same dataset/manifest/tokenizer/effective hash. Final files SHA256 khớp MLflow artifacts, provenance khớp; local artifact URI relocation + actual MlflowClient download PASS. Validation có steps40/80/120/160/200/229, step229 ghi hai lần do final evaluation của Trainer và explicit evaluate; không suy ra đây là hai independent quality tests.
+
+| Metric | LoRA | QLoRA |
+|---|---:|---:|
+| Run ID | bd847484833c4f2d9bac735de6034511 | 1f5aaf010bfc4050a8f281c71ba31b74 |
+| train_loss | 0.7016379844 | 0.7252621359 |
+| final_eval_loss | 0.7885810733 | 0.8134101033 |
+| train_and_eval_seconds | 2389.7323 | 3234.1521 |
+| peak_allocated_bytes | 4167497728 | 3841574912 |
+| peak_reserved_bytes | 9491709952 | 6473908224 |
+
+VERIFIED trong phạm vi full train/validation/save/MLflow archive và checkpoint state. Không actual GPU reload/generation adapter full, numerical tolerance, answer accuracy/base comparison/held-out test proof. Không chạy lại training hoặc evaluator local. Current environment/full provenance torch2.11.0+cu128/CUDA12.8/TeslaT4. Config full length1024/epoch1/accum32/save-eval40 giữ đúng metadata; checkpoint cuối229 thực tế được giữ. Local UI phải dùng DB mới trong kaggle-full-results, không smoke DB đã xoá. Next: user xem MLflow comparison; kiểm chứng reload full trên GPU trước dùng adapter, rồi chốt scope evaluator/base-vs-adapters nếu user yêu cầu. Chưa commit/push.
+
+## 20. Manual inference suite và notebook Kaggle — 2026-10-11
+
+User APPROVED thêm3–5 câu tăng độ phức tạp, notebook đơn giản clone/call repo, commit/push và hướng dẫn upload adapters. Updated src/inference.py main(argv), optional --demo-suite5 independent demo questions và --max-new-tokens; preserve default1 question150 tokens/sampling. Notebook inference.ipynb gọi từng method greedy512 với full final paths trong Kaggle Input, không model kernel/auto eval/training. Prepared ignored models/math-instruct-adapters.zip (hai final dirs) để user upload private dataset; không upload credentials/model lên external service tự động.
+
+Tests/test_inference_demo.py 3/3 PASS: one solver load/five calls/shared generation settings, default compatibility, invalid max tokens reject before load. Notebook Python AST PASS; adapter ZIP integrity PASS. Không actual GPU reload/generation hoặc evaluator; full inference vẫn pending. GUIDE hướng dẫn input/path/run. Commit scope gồm pending full notebook và GUIDE/PROGRESS chứa previous verified results; results.zip/generated weights không stage.
+
+Compatibility regression `python -m unittest discover -s tests -p test_training_format.py -v` PASS (9 tests, CPU/mocks/tiny model, no pretrained GPU). git diff --check PASS.

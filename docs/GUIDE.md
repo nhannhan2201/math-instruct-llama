@@ -1,6 +1,6 @@
 # Math Instruct Llama — Guide
 
-Cập nhật **2026-10-09**. Kết quả/approval/lịch sử nằm trong [PROGRESS.md](PROGRESS.md); [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) chỉ giữ lịch sử.
+Cập nhật **2026-10-11**. Kết quả/approval/lịch sử nằm trong [PROGRESS.md](PROGRESS.md); [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) chỉ giữ lịch sử.
 
 ## Kiến trúc thực tế
 
@@ -51,7 +51,7 @@ Install returncode0 và imports PASS không đồng nghĩa `pip check` PASS. Kag
 
 Full mode giữ seed42, rank4/alpha8/dropout0.05, target q/k/v/o + gate/up/down projections, LR2e-4, epoch1, microbatch1, accumulation32, cosine/warmup5 và paged_adamw_8bit. Đây là starting config, chưa benchmark tối ưu. TinyLoRA vẫn là CLI lịch sử, ngoài comparison và chưa verified GPU.
 
-Chỉ chấp nhận **một visible CUDA GPU**. T4 dùng FP16; chỉ chọn BF16 khi `is_bf16_supported(including_emulation=False)` xác nhận hỗ trợ native. Default True có thể tính cả emulation trên T4. QLoRA NF4/double quant có cùng compute dtype và phải thật sự loaded-in-4bit. TRL1.3.0 tự cast trainable quantized-model adapters sang BF16; ở FP16 mode, repo chuyển riêng trainable adapters về FP32 ngay sau Trainer initialization để FP16 GradScaler hoạt động. Frozen NF4 base không bị cast; BF16 native mode và LoRA không đổi. Snapshot kiểm tra adapter update lấy sau mọi dtype changes, để không tính rounding do cast thành optimizer update. Artifact metadata ghi `trainable_dtypes` riêng với compute precision. `use_cache=False` khi train; gradient checkpointing explicit True, `use_reentrant=False` đồng nhất ở kbit helper và Trainer. CPU contracts và Kaggle T4 runtime smoke đã PASS. Peak VRAM, resource metrics và full training feasibility chưa được trích xuất/đánh giá.
+Chỉ chấp nhận **một visible CUDA GPU**. T4 dùng FP16; chỉ chọn BF16 khi `is_bf16_supported(including_emulation=False)` xác nhận hỗ trợ native. Default True có thể tính cả emulation trên T4. QLoRA NF4/double quant có cùng compute dtype và phải thật sự loaded-in-4bit. TRL1.3.0 tự cast trainable quantized-model adapters sang BF16; ở FP16 mode, repo chuyển riêng trainable adapters về FP32 ngay sau Trainer initialization để FP16 GradScaler hoạt động. Frozen NF4 base không bị cast; BF16 native mode và LoRA không đổi. Snapshot kiểm tra adapter update lấy sau mọi dtype changes, để không tính rounding do cast thành optimizer update. Artifact metadata ghi `trainable_dtypes` riêng với compute precision. `use_cache=False` khi train; gradient checkpointing explicit True, `use_reentrant=False` đồng nhất ở kbit helper và Trainer. CPU contracts và Kaggle T4 runtime smoke đã PASS. Peak VRAM/resource metrics smoke đã VERIFIED ở section kết quả mới; full training feasibility chưa VERIFIED.
 
 Trước load weights, chạy inventory/imports trên Kaggle và lưu kết quả:
 
@@ -130,3 +130,95 @@ Archive giữ adapter/tokenizer/provenance, manifest và MLflow store; không c�
 CLI export SQLite backup nhất quán, mlruns artifact store, model outputs, manifest, logs/results vào ZIP và kiểm tra checksums. Tải `/kaggle/working/smoke-review-*.zip` cùng `smoke-pip-check.log` trong Output trước reset. Artifact URIs gốc Kaggle được giữ trong database; restore cùng path hoặc relocate rõ ràng trên host khác. Nếu verification FAIL, CLI vẫn export khi store đầy đủ rồi exit lỗi. Train/reload/preflight failure dừng sớm và giữ logs, không tuyên bố PASS. Workaround torchao và pip conflicts không chứng minh clean environment; greedy không phải accuracy/numerical tolerance. Không chạy full training hoặc sửa production training config.
 
 Nếu đã clone trước bản sửa preflight, chạy `git pull --ff-only origin main` từ repo root rồi gọi lại `CUDA_VISIBLE_DEVICES=0 python -m src.smoke_review`; không cần reset/install lại chỉ vì lỗi indentation. Preflight fail trước training nên lượt lỗi không tạo smoke run mới.
+
+## Kết quả smoke MLflow VERIFIED — 2026-10-10
+
+Hai runs trên source `f2a11f5`, Tesla T4/FP16, train đúng **2 optimizer steps trên 64 samples**, final validation100, save/reload greedy và MLflow round-trip PASS. ZIP local `smoke-review-20261010T014250450690Z.zip` có SHA256 `284bfe45c392c806c7ddf3030ae75572139b4142adeef4d7ee89799f96a63a0b`; 44 file checksums PASS. Metrics dưới đây được đối chiếu trực tiếp SQLite với verification.json; không lấy từ demo output.
+
+| Metric | LoRA | QLoRA |
+|---|---:|---:|
+| Run ID | `db8ecec18a5a46a084751a9067d40ead` | `007fe7181b6446e3a2e2acc3d0e90e9e` |
+| final_eval_loss | 1.4786574841 | 1.4764468670 |
+| adapter_update_norm | 0.0405102296 | 0.0401510722 |
+| train + final eval (s) | 33.4980 | 44.0559 |
+| peak allocated (GiB) | 3.67 | 3.35 |
+| peak reserved (GiB) | 9.11 | 8.28 |
+| trainable parameters | 2,818,048 | 2,818,048 |
+
+Cả hai FINISHED, cùng selected/effective/excluded/validation7359/7310/49/100 và effective IDs hash `92dc3e8c1d8be4b86d502fb4e355b5ef913896563a2eabb976579c82b11a0fc2`. Artifact save/download hashes và reload PASS; numerical tolerance, answer accuracy, held-out test và **full training chưa VERIFIED**. `pip check` vẫn FAIL vì các conflicts ghi trong `smoke-pip-check.log`; không tuyên bố môi trường sạch. Bản local giải nén ở `mlruns/kaggle-smoke-review-20261010/` đã relocate database artifact URIs; ZIP gốc giữ nguyên.
+
+## Full training trên Kaggle — hướng dẫn chuẩn bị, chưa chạy
+
+### 1. Chuẩn bị
+
+Chỉ chạy sau approval riêng cho full training. Bật Internet và một visible T4; dùng repo/stack đã chạy smoke. Session mới dùng clone/install ở notebook hiện tại, **không chạy cell `src.smoke_review`** nếu mục tiêu là full training. Session đang có repo chỉ pull khi working tree sạch. Ghi HEAD một lần trước hai methods, không pull giữa hai runs:
+
+```python
+%cd /kaggle/working/math-instruct-llama
+!git log -1 --oneline
+!nvidia-smi
+!python -m pip check
+```
+
+Thực hiện inventory/import/native BF16 ở section môi trường trước khi train; giữ torch/CUDA đã provision, không đổi pins/config theo warnings. Chạy tuần tự LoRA rồi QLoRA trong cùng session/repo root để cùng SQLite store/experiment, mỗi lệnh là subprocess riêng giải phóng GPU khi kết thúc. Session mới không tự chứa smoke database cũ; nếu muốn cùng UI với smoke, cần restore store có chủ đích trước training.
+
+### 2. Chạy từng method và lưu console log
+
+Các lệnh sau là **full training**, không phải smoke. Chạy một cell mỗi method, kiểm tra exit code trước khi tiếp tục:
+
+```python
+%%bash
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python -u -m src.train --method lora 2>&1 | tee /kaggle/working/lora-full.log
+```
+
+```python
+%%bash
+set -o pipefail
+CUDA_VISIBLE_DEVICES=0 python -u -m src.train --method qlora 2>&1 | tee /kaggle/working/qlora-full.log
+```
+
+Giữ nguyên config: length1024, effective7310, validation100, epoch1, microbatch1, accumulation32, LR2e-4/cosine/warmup5, seed42, r4/alpha8/dropout0.05, paged_adamw_8bit, gradient checkpointing; T4 FP16. Khoảng **229 optimizer steps** nếu dữ liệu/counts hiện tại giữ nguyên. Eval/save mỗi40 steps, log mỗi10 steps; final eval luôn chạy. Không sử dụng held-out test hoặc thay config theo kết quả này.
+
+**Tài nguyên:** smoke chỉ là prefix64, đỉnh memory3.67/3.35GiB allocated và9.11/8.28GiB reserved; full subset có sequences dài hơn nên không coi đây là giới hạn full VRAM. Chưa có cơ sở đủ chắc để hứa thời gian full run: smoke gồm startup, mới2 steps, full có scheduled validation/save. Theo dõi ETA sau vài chục steps và nvidia-smi. Chừa storage cho base/cache, manifest (~116MB), checkpoints và hai bản final (models + MLflow upload); chưa có đo tổng disk full run. Nếu OOM/session hết hạn, giữ logs/checkpoint và review trước khi thay config.
+
+### 3. Checkpoint và MLflow
+
+Ghi lại path `Saved adapter/tokenizer/protocol` cuối mỗi run. Output: `models/<method>_training_<id>/final`; checkpoints trong `checkpoints/checkpoint-N`. `save_total_limit=1` giữ checkpoint gần nhất, checkpoint cũ bị xoá. Final là weights **cuối training**, không tự chọn best validation checkpoint (`load_best_model_at_end` chưa bật). CLI hiện **không có resume flag**; không giả định chạy lại lệnh là resume, nó tạo run mới.
+
+MLflow dùng experiment `llama-3-math-instruct`, run names `lora_training`/`qlora_training`. Database `mlruns.db`, artifact store `mlruns/`; params/step metrics/final validation/time/memory và final artifact được log. Checkpoints nằm trong models, **không tự upload lên MLflow**. `adapter_update_norm` chỉ có ở smoke; không yêu cầu metric này ở full. `src.smoke_review` chỉ kiểm tra smoke64/2 steps, không dùng để kiểm tra full runs.
+
+Sau mỗi run, mở metadata final để lấy run ID, kiểm tra MLflow status FINISHED và final_eval_loss finite, final artifacts đủ adapter/tokenizer/provenance; reload CLI inference với đúng printed final path trước reset. Các metric quality trong UI là validation loss/token accuracy, chưa phải answer accuracy.
+
+### 4. Save Version và tải outputs
+
+Dùng `full-training.ipynb`: clone/install → full LoRA → full QLoRA. Chọn Save Version → Save & Run All trên Kaggle; notebook không có cell ZIP, export hoặc link download sau training. Khi version hoàn tất, tải outputs trực tiếp: `models/`, `mlruns/`, `mlruns.db` và WAL/SHM nếu có, `data/`. Giữ cấu trúc thư mục và database/artifacts cùng nhau để mở MLflow local; relocate artifact URIs Kaggle. Database riêng không chứa adapters/checkpoints. Kiểm tra cả hai runs thành công và files đã tải trước khi bỏ outputs.
+
+Mỗi train tự validation định kỳ/final, không evaluator answer accuracy. Không đổi config/reset/pull giữa methods. Source runtime đã có trên GitHub; notebook full local chưa commit/push. Lượt hướng dẫn này không chạy full training.
+
+### Local outputs sau cleanup
+
+Theo yêu cầu user, smoke ZIP/log/evidence notebook và generated models/mlruns local đã xoá để nhận full outputs. Bảng VERIFIED giữ kết quả lịch sử; đường dẫn smoke archive/local UI nêu trên không còn tồn tại. Giữ data split và runnable notebooks/code. Khi tải full về, kiểm tra runs/metrics/artifacts trước khi đánh dấu full VERIFIED, rồi relocate database và mở UI mới.
+
+## Full training Kaggle — verified outputs, 2026-10-11
+
+User tải results.zip (SHA256 `8f7029c18941f8dc0959fc105aff6b757545f7d310afa837a51883b519e7d500`). ZIP CRC PASS (118 entries); extract chỉ64 output files models/mlruns/database/data vào `kaggle-full-results/math-instruct-llama/`, không ghi đè source. ZIP gốc giữ nguyên. SQLite integrity PASS; hai runs FINISHED, checkpoint-229/global_step229/epoch1; training_selection full7310, validation100, same dataset/manifest/tokenizer/effective hash. Final files SHA256 khớp MLflow artifacts, provenance khớp; local artifact URI relocation + actual MlflowClient download PASS. Validation có steps40/80/120/160/200/229, step229 ghi hai lần do final evaluation của Trainer và explicit evaluate; không suy ra đây là hai independent quality tests.
+
+| Metric | LoRA | QLoRA |
+|---|---:|---:|
+| Run ID | bd847484833c4f2d9bac735de6034511 | 1f5aaf010bfc4050a8f281c71ba31b74 |
+| train_loss | 0.7016379844 | 0.7252621359 |
+| final_eval_loss | 0.7885810733 | 0.8134101033 |
+| train_and_eval_seconds | 2389.7323 | 3234.1521 |
+| peak_allocated_bytes | 4167497728 | 3841574912 |
+| peak_reserved_bytes | 9491709952 | 6473908224 |
+
+VERIFIED trong phạm vi full train/validation/save/MLflow archive và checkpoint state. Không actual GPU reload/generation adapter full, numerical tolerance, answer accuracy/base comparison/held-out test proof. Không chạy lại training hoặc evaluator local. Current environment/full provenance torch2.11.0+cu128/CUDA12.8/TeslaT4. Config full length1024/epoch1/accum32/save-eval40 giữ đúng metadata; checkpoint cuối229 thực tế được giữ. Local UI phải dùng DB mới trong kaggle-full-results, không smoke DB đã xoá. Next: user xem MLflow comparison; kiểm chứng reload full trên GPU trước dùng adapter, rồi chốt scope evaluator/base-vs-adapters nếu user yêu cầu. Chưa commit/push.
+
+## Inference5 câu với full adapters (2026-10-11)
+
+`inference.ipynb` đơn giản clone/install → liệt kê Input paths → gọi `python -m src.inference` cho LoRA và QLoRA lần lượt. `--demo-suite` thêm5 câu unit price/linear equation/fractions/quadratic/probability, expected finals $1.50/9/60 liters/8×12cm/10⁄21; `--greedy --max-new-tokens 512` dùng chung. Mỗi process load1 model/adapter, in question/generated answer/reference để review thủ công. Default CLI không --demo-suite vẫn1 câu/150 tokens như smoke cũ; không đổi train/data/config. Không chấm500 test, không claim accuracy.
+
+Đã chuẩn bị local `models/math-instruct-adapters.zip` chỉ gồm hai folders `<method>_training_<id>/final/` từ verified full outputs, không base weights/checkpoints/MLflow DB. Upload ZIP này vào private Kaggle Dataset, đặt tên `math-instruct-adapters`, giữ folder hierarchy. Sau processing, kiểm tra dataset có hai final directories. Upload notebook, bật Internet/GPU, Add Input dataset. Chạy find cell rồi copy đúng path final nếu Kaggle mount/layout khác với paths ví dụ. Adapter path phải là cả final directory (weights/config/tokenizer/effective_data), không chỉ safetensors. Base weights tự download pinned revision. Không upload/run full-training notebook lần nữa để infer.
+
+Có thể reuse outputs notebook training làm Input thay upload ZIP; tìm actual final paths và thay hai lệnh tương tự. Lưu outputs/Logs của5 câu mỗi method; GPU inference full vẫn pending đến chạy thực tế.
