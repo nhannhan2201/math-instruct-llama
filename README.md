@@ -23,6 +23,7 @@ Các notebook nằm trong [notebooks/](notebooks/). Chọn notebook theo mục �
 | [web-ui-peft.ipynb](notebooks/web-ui-peft.ipynb) | Khởi động hai server LoRA/QLoRA, gateway và ngrok để web UI gọi model |
 | [inference-lora-qlora.ipynb](notebooks/inference-lora-qlora.ipynb) | Tải từng adapter và thử các bài toán trực tiếp trong notebook, không cần web UI |
 | [full-training.ipynb](notebooks/full-training.ipynb) | Fine-tune LoRA/QLoRA, chạy validation và lưu adapter cùng MLflow tracking |
+| [test-base-tuned-models.ipynb](notebooks/test-base-tuned-models.ipynb) | Chấm cùng 500 mẫu test cho Base/LoRA/QLoRA; có output các lần chạy và xuất artifact MLflow |
 
 **Muốn chạy chatbot, dùng `web-ui-peft.ipynb`. Không cần huấn luyện lại nếu đã có adapter.**
 
@@ -72,7 +73,27 @@ Gateway chỉ chuyển tiếp request; mỗi API model tải adapter một lần
 
 ## Chấm tập test MathInstruct
 
-`src/test.py` chấm dự đoán token của lời giải mẫu trên 500 nhóm câu hỏi test đã giữ riêng trong split manifest. Chạy lần lượt trên một GPU Kaggle sau khi cài `requirements.txt` và thêm hai adapter làm Input:
+### Kết quả
+
+Đánh giá ngày **18/10/2026** trên **500 nhóm câu hỏi test MathInstruct** đã tách khỏi train/validation theo câu hỏi được chuẩn hóa khoảng trắng. [Notebook test](notebooks/test-base-tuned-models.ipynb) lưu output của cả ba model; số liệu dưới đây lấy từ các run MLflow tương ứng.
+
+| Model | `test_loss` ↓ | `test_mean_token_accuracy` ↑ | `test_runtime` (giây) |
+|---|---:|---:|---:|
+| Base | 1,5334 | 69,00% | 38,34 |
+| LoRA | **0,7904** | **79,71%** | 48,93 |
+| QLoRA | 0,8110 | 79,41% | 64,60 |
+
+Điều kiện đo: **Tesla T4**, eval batch size **1**, cùng base model/tokenizer revision và chat template, xử lý lần lượt từng model trên GPU 0. Base và LoRA dùng FP16; QLoRA dùng base **4-bit NF4 + double quantization**, compute FP16. Cả 500 lời giải được giữ đầy đủ, dài nhất **1.637 token**; không cắt về giới hạn 1.024 token của training.
+
+- `test_loss`: cross entropy trên các token thuộc completion; prompt không đóng góp vào loss.
+- `test_mean_token_accuracy`: dự đoán top-1 token tiếp theo khi cung cấp các token đúng trước đó (**teacher forcing**). TRL 1.3 tính trung bình accuracy từng mẫu với batch size 1; bảng hiển thị dưới dạng phần trăm.
+- `test_runtime`: thời gian vòng đánh giá sau khi nạp model và chuẩn bị dữ liệu. Đây là một lần đo cho mỗi model, không phải latency sinh câu trả lời hay tổng thời gian chạy script.
+
+LoRA tăng **10,71 điểm phần trăm** token accuracy so với Base; QLoRA tăng **10,41 điểm phần trăm**. Các kết quả này đo mức dự đoán lời giải mẫu, **không phải tỷ lệ bài toán giải đúng**. Chưa có đánh giá đáp án cuối từ lời giải model tự sinh.
+
+### Chạy lại
+
+Import [notebook test](notebooks/test-base-tuned-models.ipynb) lên Kaggle, bật Internet/GPU, thêm hai adapter làm Input và kiểm tra đường dẫn. Sau khi cài `requirements.txt`, chạy lần lượt từ thư mục gốc repo:
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 python -m src.test --method base
@@ -80,4 +101,12 @@ CUDA_VISIBLE_DEVICES=0 python -m src.test --method lora --adapter-path /kaggle/i
 CUDA_VISIBLE_DEVICES=0 python -m src.test --method qlora --adapter-path /kaggle/input/datasets/nhannhan22/models/qlora_training_6c775f8d8113/final
 ```
 
-Thay đường dẫn adapter nếu Kaggle Input của bạn khác. Mỗi lệnh tạo một run trong experiment `llama-3-math-instruct-test` ở `mlruns.db`, ghi `test_loss`, `test_mean_token_accuracy`, tốc độ đánh giá và `test_protocol.json`. Tải database **và thư mục artifact MLflow** từ Kaggle nếu muốn xem đầy đủ trên máy local. Evaluation giữ đầy đủ 500 lời giải, không cắt về giới hạn 1024 token của training; cả ba model dùng cùng protocol. Script dừng nếu snapshot, metadata hoặc độ dài vượt context của model. Token accuracy theo TRL 1.3 là trung bình accuracy từng mẫu (eval batch size 1), được lấy từ callback logging. Đây là teacher-forced token accuracy, **không phải tỷ lệ giải đúng bài toán**.
+Script [src/test.py](src/test.py) xác minh snapshot dữ liệu và metadata adapter, tái sử dụng split manifest (hoặc tạo lại theo thuật toán đã cố định), rồi chỉ gọi `evaluate()`. Script dừng nếu mẫu vượt context của model. Mỗi lệnh tạo một run trong experiment `llama-3-math-instruct-test` ở `mlruns.db`, ghi metric và `test_protocol.json` chứa danh sách mẫu test, run ID và kết quả. `test_num_tokens` do TRL xuất là bộ đếm token training, bằng 0 trong run chỉ đánh giá; không dùng metric này để đếm token test.
+
+Để lưu kết quả, tải **`mlruns.db` và thư mục `mlruns/`** từ Kaggle, đặt cạnh nhau trong `kaggle-test-results/`. Xem metric local bằng:
+
+```bash
+mlflow ui --backend-store-uri sqlite:///kaggle-test-results/mlruns.db --host 127.0.0.1 --port 5000
+```
+
+Mở `http://127.0.0.1:5000`, chọn experiment và Compare ba run trong giao diện Model training. Artifact URI trong database tải từ Kaggle có thể cần đổi sang đường dẫn local để xem artifact trong UI.
