@@ -69,3 +69,15 @@ Gateway · Kaggle · port 8080
 Gateway chỉ chuyển tiếp request; mỗi API model tải adapter một lần khi khởi động. CORS mặc định cho phép UI ở `localhost:5173` và `127.0.0.1:5173`. Nếu đổi địa chỉ UI, cấu hình `UI_ORIGINS` rồi khởi động lại gateway.
 
 > Model có thể trả lời sai, kể cả bài đơn giản. Hai ảnh trên là minh họa demo, không phải đánh giá accuracy. Mỗi câu hỏi được xử lý độc lập; lịch sử UI không được gửi cho model.
+
+## Chấm tập test MathInstruct
+
+`src/test.py` chấm dự đoán token của lời giải mẫu trên 500 nhóm câu hỏi test đã giữ riêng trong split manifest. Chạy lần lượt trên một GPU Kaggle sau khi cài `requirements.txt` và thêm hai adapter làm Input:
+
+```bash
+CUDA_VISIBLE_DEVICES=0 python -m src.test --method base
+CUDA_VISIBLE_DEVICES=0 python -m src.test --method lora --adapter-path /kaggle/input/datasets/nhannhan22/models/lora_training_5c645da682df/final
+CUDA_VISIBLE_DEVICES=0 python -m src.test --method qlora --adapter-path /kaggle/input/datasets/nhannhan22/models/qlora_training_6c775f8d8113/final
+```
+
+Thay đường dẫn adapter nếu Kaggle Input của bạn khác. Mỗi lệnh tạo một run trong experiment `llama-3-math-instruct-test` ở `mlruns.db`, ghi `test_loss`, `test_mean_token_accuracy`, tốc độ đánh giá và `test_protocol.json`. Tải database **và thư mục artifact MLflow** từ Kaggle nếu muốn xem đầy đủ trên máy local. Script sẽ dừng nếu snapshot dữ liệu, metadata adapter hoặc giới hạn độ dài mẫu không khớp protocol; không tự bỏ mẫu test. Đây là teacher-forced token accuracy, **không phải tỷ lệ giải đúng bài toán**.
