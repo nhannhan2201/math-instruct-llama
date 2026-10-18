@@ -14,7 +14,7 @@ import mlflow
 import torch
 from datasets import Dataset, load_dataset
 from peft import PeftModel
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, set_seed
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainerCallback, set_seed
 from trl import SFTConfig, SFTTrainer
 
 from src.config import (BASE_MODEL, BASE_REVISION, CHAT_TEMPLATE_KWARGS,
@@ -46,10 +46,27 @@ def build_test_dataset(raw, tokenizer, manifest):
             raise ValueError(f"Invalid completion boundary for test row {index}")
         if ids[0] != tokenizer.bos_token_id or ids[-1] != tokenizer.convert_tokens_to_ids("<|eot_id|>"):
             raise ValueError(f"Invalid special tokens for test row {index}")
-        if len(ids) > MAX_SEQ_LENGTH:
-            raise ValueError(f"Test row {index} has {len(ids)} tokens; exceeds max_length={MAX_SEQ_LENGTH}")
         examples.append(example)
     return Dataset.from_list(examples)
+
+
+class EvaluationMetrics(TrainerCallback):
+    """TRL 1.3 adds token accuracy to log events, not evaluate()'s return value."""
+
+    def __init__(self):
+        self.values = {}
+
+    def on_log(self, args, state, control, logs=None, **kwargs):
+        self.values.update({key: value for key, value in (logs or {}).items()
+                            if key.startswith("eval_")})
+
+
+def evaluate_test(trainer, collector):
+    collector.values.clear()
+    returned = trainer.evaluate()
+    return {"test_" + key[len("eval_"):]: float(value)
+            for key, value in {**returned, **collector.values}.items()
+            if key.startswith("eval_") and isinstance(value, (float, int))}
 
 
 def verify_adapter(path, method, tokenizer, manifest):
@@ -109,15 +126,24 @@ def main(argv=None):
     if metadata is not None:
         model = PeftModel.from_pretrained(model, str(args.adapter_path), is_trainable=False)
     model.eval()
+    lengths = [len(tokenizer.apply_chat_template(
+        example["prompt"] + example["completion"], tokenize=True,
+        return_dict=False, **CHAT_TEMPLATE_KWARGS)) for example in dataset]
+    longest = max(lengths)
+    if longest > model.config.max_position_embeddings:
+        raise ValueError(f"Test length {longest} exceeds model context capacity")
+    print(f"Test: {len(dataset)} complete samples; longest={longest} tokens; no truncation", flush=True)
 
     config = SFTConfig(
         output_dir=f"models/test_{args.method}", per_device_eval_batch_size=1,
         report_to="none", bf16=dtype == torch.bfloat16,
-        fp16=dtype == torch.float16, max_length=MAX_SEQ_LENGTH,
+        fp16=dtype == torch.float16, max_length=None,
         completion_only_loss=True, assistant_only_loss=False,
         packing=False, padding_free=False, remove_unused_columns=False)
-    trainer = SFTTrainer(model=model, args=config, eval_dataset=dataset,
-                         processing_class=tokenizer)
+    collector = EvaluationMetrics()
+    # TRL 1.3 requires train_dataset even for evaluation. Never call train().
+    trainer = SFTTrainer(model=model, args=config, train_dataset=dataset, eval_dataset=dataset,
+                         processing_class=tokenizer, callbacks=[collector])
     mlflow.set_tracking_uri(args.tracking_uri)
     mlflow.set_experiment("llama-3-math-instruct-test")
     with mlflow.start_run(run_name=f"{args.method}_test") as run:
@@ -125,14 +151,16 @@ def main(argv=None):
             "method": args.method, "base_model": BASE_MODEL, "base_revision": BASE_REVISION,
             "dataset_id": DATASET_ID, "dataset_revision": DATASET_REVISION,
             "snapshot_hash": DATASET_SNAPSHOT_HASH, "manifest_hash": digest(manifest),
-            "test_groups": len(dataset), "max_length": MAX_SEQ_LENGTH,
+            "test_groups": len(dataset), "training_max_length": MAX_SEQ_LENGTH,
+            "test_max_length": longest, "test_truncation": "none",
+            "accuracy_aggregation": "mean_per_example_batch_size_1_trl_1.3",
             "completion_only_loss": True, "seed": SEED, "precision": str(dtype),
             "gpu": torch.cuda.get_device_name(0),
             "adapter_path": str(args.adapter_path) if args.adapter_path else "none",
             "training_run_id": metadata.get("run_id", "unknown") if metadata else "none",
             "trl_version": version("trl"), "transformers_version": version("transformers"),
         })
-        metrics = trainer.evaluate(metric_key_prefix="test")
+        metrics = evaluate_test(trainer, collector)
         for key in ("test_loss", "test_mean_token_accuracy"):
             if key not in metrics or not math.isfinite(float(metrics[key])):
                 raise ValueError(f"Missing or nonfinite metric: {key}")
